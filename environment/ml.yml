@@ -12,11 +12,10 @@ dependencies:
   - matplotlib
   - numpy
   - pandas
-  - python==3.10
+  - python
   - scikit-learn
   - scipy
-  - seaborn
-  - tqdm
+  - tensorflow
   - xgboost
-prefix: c:/users/amundy/anaconda3/envs/ml
+prefix: ~/anaconda3/envs/ml
 
