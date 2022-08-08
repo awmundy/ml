@@ -1,0 +1,22 @@
+name: ml
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - boto3
+  - fastparquet
+  - h5py
+  - jupyter
+  - keras
+  - lightgbm
+  - matplotlib
+  - numpy
+  - pandas
+  - python==3.10
+  - scikit-learn
+  - scipy
+  - seaborn
+  - tqdm
+  - xgboost
+prefix: c:/users/amundy/anaconda3/envs/ml
+
