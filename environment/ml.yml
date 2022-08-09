@@ -17,5 +17,5 @@ dependencies:
   - scipy
   - tensorflow
   - xgboost
-prefix: ~/anaconda3/envs/ml
+prefix: ~/miniconda3/envs/ml
 
