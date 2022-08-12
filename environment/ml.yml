@@ -15,7 +15,7 @@ dependencies:
   - python
   - scikit-learn
   - scipy
-  - tensorflow
+  - tensorflow-gpu
   - xgboost
 prefix: ~/miniconda3/envs/ml
 
