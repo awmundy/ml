@@ -84,8 +84,8 @@ inputs = np.vstack((negative_samples, positive_samples)).astype(np.float32)
 targets = np.vstack((np.zeros((num_samples_per_class, 1), dtype="float32"),
                      np.ones((num_samples_per_class, 1), dtype="float32")))
 
-# plt.scatter(inputs[:, 0], inputs[:, 1], c=targets[:, 0])
-# plt.show()
+plt.scatter(inputs[:, 0], inputs[:, 1], c=targets[:, 0])
+plt.show()
 
 input_dim = 2
 output_dim = 1
@@ -119,3 +119,4 @@ for step in range(40):
 predictions = model(inputs, W, b)
 plt.scatter(inputs[:, 0], inputs[:, 1], c=predictions[:, 0] > 0.5)
 plt.show()
+
