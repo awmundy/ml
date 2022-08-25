@@ -4,6 +4,7 @@ from tensorflow import keras
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import pandas as pd
 import mpld3
 
@@ -32,14 +33,20 @@ def value_counts_np(np_array, sort_by_count=True):
 
     return value_counts
 
+def get_history_df(history, pretty_cols=False):
+
+    history_df = pd.DataFrame(history.history)
+    history_df.insert(0, 'epoch', range(1, len(history_df) + 1))
+
+    if pretty_cols:
+        for col in [x for x in history_df if x != 'epoch']:
+            history_df[col] = round(history_df[col] * 100, 3).astype(str).str.ljust(5, '0') + '%'
+    
+    return history_df
 
 def write_output_html(fail_dist, history):
 
-    epoch_df = pd.DataFrame(history.history)
-    epoch_df.insert(0, 'epoch', range(1, len(epoch_df) + 1))
-    for col in [x for x in epoch_df if x != 'epoch']:
-        epoch_df[col] = round(epoch_df[col] * 100, 3).astype(str).str.ljust(5, '0') + '%'
-
+    history_df = get_history_df(history, pretty_cols=True)
 
     output_path = os.path.expanduser('~/Desktop/test2.html')
     if os.path.exists(output_path):
@@ -49,13 +56,13 @@ def write_output_html(fail_dist, history):
     val_counts_1.index.name = 'Category'
     val_counts_1.reset_index(inplace=True)
     val_counts_2 = val_counts_1.sort_values(by='Category')
-
+    
     html =  f"""
     <html>
       <head>
       </head>
       <body>
-        <h2>Failing Observations Distribution</h2>
+        <h2>Failing Test Observations Distribution</h2>
         <table style="width:50%">
             <tr>
               <td>{val_counts_1.to_html(index=False)}</td>
@@ -64,7 +71,7 @@ def write_output_html(fail_dist, history):
           </table>
           <br>
           <h2>Epoch Summary</h2>
-          {epoch_df.to_html(index=False)}
+          {history_df.to_html(index=False)}
       </body>
     </html>
     """
@@ -154,6 +161,30 @@ fail_images = test_images[fail_idxs]
 fail_dist = value_counts_np(fail_labels)
 
 write_output_html(fail_dist, history)
+
+output_path = os.path.expanduser('~/Desktop/test2.html')
+df = get_history_df(history)
+
+
+if os.path.exists(output_path):
+    os.remove(output_path)
+fig = plt.figure(figsize=(5,5))
+ax = fig.add_subplot(1,1,1)
+ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1.0))
+plt.plot(df['epoch'], df['accuracy'], "bo", label="Training accuracy")
+plt.plot(df['epoch'], df['val_accuracy'], "b", label="Validation accuracy")
+plt.plot(df['epoch'], df['loss'], "ro", label="Training loss")
+plt.plot(df['epoch'], df['val_loss'], "r", label="Validation loss")
+plt.xlabel("Epochs")
+plt.ylabel("Accuracy/Loss")
+plt.legend()
+html = mpld3.fig_to_html(fig)
+with open(output_path, 'a') as report:
+    report.write(html)
+    report.close()
+
+
+
 
 
 
