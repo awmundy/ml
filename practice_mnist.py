@@ -37,7 +37,7 @@ def write_output_html(fail_dist, history):
 
     epoch_df = pd.DataFrame(history.history)
     epoch_df.insert(0, 'epoch', range(1, len(epoch_df) + 1))
-    for col in ['loss', 'accuracy']:
+    for col in [x for x in epoch_df if x != 'epoch']:
         epoch_df[col] = round(epoch_df[col] * 100, 3).astype(str).str.ljust(5, '0') + '%'
 
 
@@ -76,25 +76,54 @@ def write_output_html(fail_dist, history):
     #     # t = plt.imshow(fail_images[0].reshape(28,28), cmap=plt.cm.binary)
     #     # mpld3.save_html(t, report)
 
-def shuffle_np(np_array, constant_seed=True):
+def shuffle_np(np_arrays, constant_seed=True):
+    '''
+    np_arrays: np array or tuple of np arrays of the same length
+    '''
+
+    # store in a tuple if it's not already
+    if type(np_arrays) == np.ndarray:
+        np_arrays = (np_arrays,)
+
+    array_len = len(np_arrays[0])
+
+    for array in np_arrays:
+        assert len(array) == array_len, 'all arrays must be the same length'
 
     # keeps the shuffle consistent every re-run
     if constant_seed:
-        shuffled_idxs = np.random.RandomState(seed=1).permutation(len(np_array))
+        shuffled_idxs = np.random.RandomState(seed=1).permutation(array_len)
     else:
-        shuffled_idxs = np.random.permutation(len(np_array))
+        shuffled_idxs = np.random.permutation(array_len)
 
-    shuffled = np_array[shuffled_idxs]
+    out = ()
+    for np_array in np_arrays:
+        out += (np_array[shuffled_idxs],)
 
-    return shuffled
+    return out
+
+def split_out_validation_obs(train_data, train_labels, validation_frac):
+    assert 0 < validation_frac < 1, 'validation frac must be greater than 0 and less than 1'
+    assert len(train_data) == len(train_labels), 'training data and labels must be the same length'
+
+    n_validation_obs = int(validation_frac * len(train_data))
+    validation_data = train_data[:n_validation_obs]
+    train_data = train_data[n_validation_obs:]
+    validation_labels = train_labels[:n_validation_obs]
+    train_labels = train_labels[n_validation_obs:]
+
+    return train_data, train_labels, validation_data, validation_labels
 
 
 
-
-
+# Params
+validation_frac = .2
+#--------
 
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
+train_images, train_labels, validation_images, validation_labels = \
+    split_out_validation_obs(train_images, train_labels, validation_frac)
 
 model = keras.Sequential([
     layers.Dense(512, activation="relu"),
@@ -105,7 +134,11 @@ model.compile(optimizer="rmsprop",
               loss="sparse_categorical_crossentropy",
               metrics=["accuracy"])
 
-history = model.fit(train_images, train_labels, epochs=5, batch_size=128)
+history = model.fit(train_images,
+                    train_labels,
+                    epochs=5,
+                    batch_size=128,
+                    validation_data=(validation_images, validation_labels))
 
 # measure accuracy against test data
 test_loss, test_acc = model.evaluate(test_images, test_labels)
