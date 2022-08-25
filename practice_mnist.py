@@ -9,7 +9,8 @@ import mpld3
 
 # turn off tensorflow info messages about e.g. cpu optimization features (turn
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format}) # no scientific notation
+# no scientific notation
+np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
 
 
 
@@ -31,22 +32,66 @@ def value_counts_np(np_array, sort_by_count=True):
 
     return value_counts
 
-def write_output_html(fail_dist):
+
+def write_output_html(fail_dist, history):
+
+    epoch_df = pd.DataFrame(history.history)
+    epoch_df.insert(0, 'epoch', range(1, len(epoch_df) + 1))
+    for col in ['loss', 'accuracy']:
+        epoch_df[col] = round(epoch_df[col] * 100, 3).astype(str).str.ljust(5, '0') + '%'
+
+
     output_path = os.path.expanduser('~/Desktop/test2.html')
     if os.path.exists(output_path):
         os.remove(output_path)
-    with open(output_path, 'a') as report:
-        # todo try building a figure that also shows what we want
-        # t = plt.imshow(fail_images[0].reshape(28,28), cmap=plt.cm.binary)
-        # mpld3.save_html(t, report)
 
-        val_counts_1 = pd.DataFrame(fail_dist)
-        val_counts_1.index.name = 'Category'
-        val_counts_1.reset_index(inplace=True)
-        val_counts_2 = val_counts_1.sort_values(by='Category')
-        header = '<b> Incorrect predictions </b> <br><br>'
-        report.write(header + val_counts_1.to_html(index=False) +
-                     "<br><br>" + val_counts_2.to_html(index=False))
+    val_counts_1 = pd.DataFrame(fail_dist)
+    val_counts_1.index.name = 'Category'
+    val_counts_1.reset_index(inplace=True)
+    val_counts_2 = val_counts_1.sort_values(by='Category')
+
+    html =  f"""
+    <html>
+      <head>
+      </head>
+      <body>
+        <h2>Failing Observations Distribution</h2>
+        <table style="width:50%">
+            <tr>
+              <td>{val_counts_1.to_html(index=False)}</td>
+              <td>{val_counts_2.to_html(index=False)}</td> 
+            </tr>
+          </table>
+          <br>
+          <h2>Epoch Summary</h2>
+          {epoch_df.to_html(index=False)}
+      </body>
+    </html>
+    """
+    with open(output_path, 'a') as report:
+        report.write(html)
+
+    # with open(output_path, 'a') as report:
+    #     # todo try building a matplotlib figure that also shows what we want, so we can write it out as html
+    #     # t = plt.imshow(fail_images[0].reshape(28,28), cmap=plt.cm.binary)
+    #     # mpld3.save_html(t, report)
+
+def shuffle_np(np_array, constant_seed=True):
+
+    # keeps the shuffle consistent every re-run
+    if constant_seed:
+        shuffled_idxs = np.random.RandomState(seed=1).permutation(len(np_array))
+    else:
+        shuffled_idxs = np.random.permutation(len(np_array))
+
+    shuffled = np_array[shuffled_idxs]
+
+    return shuffled
+
+
+
+
+
 
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
@@ -60,7 +105,7 @@ model.compile(optimizer="rmsprop",
               loss="sparse_categorical_crossentropy",
               metrics=["accuracy"])
 
-model.fit(train_images, train_labels, epochs=5, batch_size=128)
+history = model.fit(train_images, train_labels, epochs=5, batch_size=128)
 
 # measure accuracy against test data
 test_loss, test_acc = model.evaluate(test_images, test_labels)
@@ -74,21 +119,17 @@ fail_idxs = np.nonzero(max_pred != test_labels)[0]
 fail_labels = test_labels[fail_idxs]
 fail_images = test_images[fail_idxs]
 fail_dist = value_counts_np(fail_labels)
-print(fail_dist)
 
-write_output_html(fail_dist)
-
+write_output_html(fail_dist, history)
 
 
-# pre process
-# model spec
-# model compile
+
 # checkpoint callbacks
 # graph training progress
 # record spec used
-# model fit
 
 
 # metadata elements
 #   - n training, test, validation datasets
 #   - dimensions of an observation (if relevant)
+#   - train acc, test acc
