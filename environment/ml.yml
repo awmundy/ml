@@ -10,6 +10,7 @@ dependencies:
   - keras
   - lightgbm
   - matplotlib
+  - mpld3
   - numpy
   - pandas
   - plotly
