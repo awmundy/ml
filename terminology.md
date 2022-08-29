@@ -1,11 +1,13 @@
-# parameters (machine learning)
+# Parameters (machine learning)
 ### Weights and biases
 
-# hyperparameters
+# Hyperparameters
 ### Model configuration specs, e.g. learning_rate, batch_size
 
 # batch_size
-### Number of observations that are passed through the network at once during an epoch. All training observations will be passed through during the epoch. <batch_size> observations are propagated forward, and then backpropagation updates the weights. Then the next <batch_size> observations are processed. 
+## Number of observations that are passed through the network at once during an epoch. 
+- All training observations will be passed through during the epoch. 
+- <batch_size> observations are propagated forward, and then backpropagation updates the weights. Then the next <batch_size> observations are processed. 
 - A batch_size of 1 is also called Stochastic Gradient Descent. 
   - One observation is passed through, the error is calculated, the gradient for each node is calculated, the parameters are updated, and then the cycle repeats
   - With Stochasic Gradient Descent, the gradient is calculated very accurately, but it takes a long time to train. 
@@ -19,8 +21,23 @@
 - https://ai.stackexchange.com/a/20380
 - https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
 
+# Epoch
+### A full iterations over the training datasets during model training.
+- Usually, multiple epochs are used and their improvement (or worsening) at accuracy is tracked. 
 
+# Learning rate
+### Amount the gradient is multiplied by the gradient during backpropagation to update a weight.
+- Smaller learning rates mean smaller steps taken during gradient descent. This can lead to being trapped in local minimums, and requires more epochs to hit peak accuracy (possibly more than are necessary). 
+- Larger learning rates can lead to divergence as the steps taken move wildly along the slopes
+#### Links
+- https://www.jeremyjordan.me/nn-learning-rate/
 
+# Validation data
+### A subset of the overall dataset that is used during model training to assist with hyperparameter tuning. 
+- The model is not trained on this data. Rather, this data is used during each epoch to test the model's accuracy after gradient descent is complete.
+- If accuracy on the validation set seems low, divergent, slow, etc, hyperparameters and/or preprocesing should be done to improve the model.
+#### Links
+-https://stackoverflow.com/a/46308466/10199577
 
 ## Generally useful links
 - https://developers.google.com/machine-learning/glossary
