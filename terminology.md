@@ -1,0 +1,26 @@
+# parameters (machine learning)
+### Weights and biases
+
+# hyperparameters
+### Model configuration specs, e.g. learning_rate, batch_size
+
+# batch_size
+### Number of observations that are passed through the network at once during an epoch. All training observations will be passed through during the epoch. <batch_size> observations are propagated forward, and then backpropagation updates the weights. Then the next <batch_size> observations are processed. 
+- A batch_size of 1 is also called Stochastic Gradient Descent. 
+  - One observation is passed through, the error is calculated, the gradient for each node is calculated, the parameters are updated, and then the cycle repeats
+  - With Stochasic Gradient Descent, the gradient is calculated very accurately, but it takes a long time to train. 
+- A batch_size equal to the number of training observations is called Batch Gradient Descent
+  - All observations are still passed through one at a time, and their gradients are calculated. The gradients for all observations are then summed, and the parameters are updated using this summed gradient.
+  - There is therefore only 1 forward pass/backpropagation cycle.
+  - With BGD, all training data must be stored in memory
+- A batch_size between 1 and the total number of training observations is called Mini Batch Gradient Descent
+  - <batch_size> obervations (sequentially selected by default) are selected from the training data. The same procedure as Batch Gradient Descent is then performed. Then the next batch of samples are selelcted, and the cycle continues
+#### Links
+- https://ai.stackexchange.com/a/20380
+- https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
+
+
+
+
+## Generally useful links
+- https://developers.google.com/machine-learning/glossary
