@@ -194,13 +194,16 @@ def build_fail_images_plot_html(fail_images):
 validation_frac = .2
 #--------
 
+# todo write data assertions and wrap in a function (e.g. output layer has same # of nodes as # of categories)
+# todo play with builtin metadata tools
+# todo plot benchmark line on accuracy graphs
+# todo try k-fold cross validation
+
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
 train_images, train_labels, validation_images, validation_labels = \
     split_out_validation_obs(train_images, train_labels, validation_frac)
 
-# todo do i have to prep the validation images
-# todo question: why does the model have a good accuracy with fewer than 10 nodes
 
 model = keras.Sequential([
     layers.Dense(512, activation="relu"),
