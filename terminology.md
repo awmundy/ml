@@ -1,6 +1,6 @@
 # batch_size
 ### Number of observations that are passed through the network at once during an epoch. 
-- All training observations will be passed through during the epoch. 
+- All training observations will ultimately be passed through during the epoch. batch_size determines the number that have their gradients combined before backpropagation.
 - <batch_size> observations are propagated forward, and then backpropagation updates the weights. Then the next <batch_size> observations are processed. 
 - A batch_size of 1 is also called Stochastic Gradient Descent. 
   - One observation is passed through, the error is calculated, the gradient for each node is calculated, the parameters are updated, and then the cycle repeats
