@@ -16,21 +16,22 @@
 - https://towardsdatascience.com/batch-mini-batch-stochastic-gradient-descent-7a62ecba642a
 
 # Epoch
-### A full iteration over the training datasets during model training.
+### A full iteration over the training dataset during model training.
 - Usually, multiple epochs are used and their improvement (or worsening) at accuracy is tracked. 
 
 # Hyperparameters
 ### Model configuration specs, e.g. learning_rate, batch_size
 
 # Learning rate
-### Amount the gradient is multiplied during backpropagation to update a weight.
+### Amount the gradient is multiplied by during backpropagation to update a weight.
+- Determines the size of the steps taken during gradient decent
 - Smaller learning rates mean smaller steps taken during gradient descent. This can lead to being trapped in local minimums, and requires more epochs to hit peak accuracy (possibly more than are necessary). 
 - Larger learning rates can lead to divergence as the steps taken move wildly along the slopes
 #### Links
 - https://www.jeremyjordan.me/nn-learning-rate/
 
 # Parameters
-### Weights and biases
+### Weights and biases for each node
 
 # Validation data
 ### A subset of the overall dataset that is used during model training to assist with hyperparameter tuning. 
