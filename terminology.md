@@ -8,14 +8,13 @@
 
 # batch_size
 ### Number of observations that are passed through the network at once during an epoch. 
-- All training observations will ultimately be passed through during the epoch. batch_size determines the number of observations that are used to calculate the loss gradient.
-- <batch_size> observations are propagated forward, and then backpropagation updates the weights. Then the next <batch_size> observations are processed. 
+- All training observations will ultimately be passed through during the epoch. The batch_size determines the number of observations that are used to calculate the loss gradient.
+- <batch_size> observations are processed forward through the network, the gradients are calculated, and weights are updated. Then the next <batch_size> observations are processed. 
 - A batch_size of 1 is also called Stochastic Gradient Descent. 
   - One observation is passed through, the error is calculated, the gradient for each node is calculated, the parameters are updated, and then the cycle repeats
   - With Stochastic Gradient Descent, the gradient is calculated very accurately, but it takes a long time to train. 
 - A batch_size equal to the number of training observations is called Batch Gradient Descent
-  - All observations are still passed through one at a time, and their gradients are calculated. The gradients for all observations are then summed, and the parameters are updated using this summed gradient.
-  - There is therefore only 1 forward pass/backpropagation cycle.
+  - All observations are still passed through one at a time, but this time a single set of gradients is calculated.
   - With BGD, all training data must be stored in memory
 - A batch_size between 1 and the total number of training observations is called Mini Batch Gradient Descent
   - <batch_size> obervations (sequentially selected by default) are selected from the training data. The same procedure as Batch Gradient Descent is then performed. Then the next batch of samples are selelcted, and the cycle continues
