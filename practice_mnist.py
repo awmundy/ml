@@ -1,3 +1,4 @@
+import tensorflow as tf
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras import layers
 from tensorflow import keras
@@ -7,12 +8,26 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import pandas as pd
 import mpld3
+from numpy.random import seed as np_seed
+from random import seed as python_seed
 
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 # no scientific notation
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
 
+def use_cpu_and_make_results_reproducible():
+    # Makes GPU invisible to tensorflow
+    os.environ['CUDA_VISIBLE_DEVICES'] = ""
+
+    # set python, numpy and tensorflow seeds so that operations
+    #   involving randomness can be reperformed consistently
+    os.environ['PYTHONHASHSEED'] = "1"
+    python_seed(1)
+
+    # numpy seed
+    np_seed(1)
+    tf.random.set_seed(2)
 
 def denormalize_images(images):
     images = images * 255
@@ -198,6 +213,7 @@ def print_processor_type():
 # todo try k-fold cross validation
 # todo when needed on other data, figure out the intuition behind fit_transform on training, transform on test
 
+use_cpu_and_make_results_reproducible()
 print_processor_type()
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
@@ -214,7 +230,8 @@ model.compile(optimizer="rmsprop",
 
 history = model.fit(train_images,
                     train_labels,
-                    epochs=20,
+                    shuffle=False,
+                    epochs=5,
                     batch_size=128,
                     validation_split=.2)
 
