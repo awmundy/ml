@@ -59,9 +59,6 @@ def build_fail_counts_html(fail_dist, pred_accuracy):
     # todo move this out of here
     pred_accuracy_pct = str(round(pred_accuracy * 100, 3)) + '%'
 
-    if os.path.exists(out_path):
-        os.remove(out_path)
-
     # get value counts sorted by values and by index
     val_counts_1 = pd.DataFrame(fail_dist)
     val_counts_1.index.name = 'Category'
@@ -200,6 +197,7 @@ validation_frac = .2
 # todo try k-fold cross validation
 # todo when needed on other data, figure out the intuition behind fit_transform on training, transform on test
 
+print_processor_type()
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
 
