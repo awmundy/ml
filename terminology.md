@@ -1,10 +1,18 @@
+# Backpropagation
+### Multiple usages
+- An algorithm that includes a forward pass and a backwards pass to calculate a gradient for each node.
+  - The forward pass is the calculation of each node given the input data, moving forward through the network
+  - The backwards pass is the calculation of the gradient for each node, moving backward through the network
+- (informal) Forward and backwards pass, plus weight updating
+- (informal) Backwards pass, plus weight updating
+
 # batch_size
 ### Number of observations that are passed through the network at once during an epoch. 
-- All training observations will ultimately be passed through during the epoch. batch_size determines the number that have their gradients combined before backpropagation.
+- All training observations will ultimately be passed through during the epoch. batch_size determines the number of observations that have their gradients combined before backpropagation.
 - <batch_size> observations are propagated forward, and then backpropagation updates the weights. Then the next <batch_size> observations are processed. 
 - A batch_size of 1 is also called Stochastic Gradient Descent. 
   - One observation is passed through, the error is calculated, the gradient for each node is calculated, the parameters are updated, and then the cycle repeats
-  - With Stochasic Gradient Descent, the gradient is calculated very accurately, but it takes a long time to train. 
+  - With Stochastic Gradient Descent, the gradient is calculated very accurately, but it takes a long time to train. 
 - A batch_size equal to the number of training observations is called Batch Gradient Descent
   - All observations are still passed through one at a time, and their gradients are calculated. The gradients for all observations are then summed, and the parameters are updated using this summed gradient.
   - There is therefore only 1 forward pass/backpropagation cycle.
