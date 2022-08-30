@@ -186,10 +186,11 @@ def build_fail_images_plot_html(fail_images):
 
     return html
 
-
-# Params
-validation_frac = .2
-#--------
+def print_processor_type():
+    if len(tf.config.list_physical_devices('GPU')) > 0:
+        print('Using GPU')
+    else:
+        print('Using CPU')
 
 # todo write data assertions and wrap in a function (e.g. output layer has same # of nodes as # of categories)
 # todo play with builtin metadata tools
