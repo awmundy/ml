@@ -202,8 +202,6 @@ validation_frac = .2
 
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
-train_images, train_labels, validation_images, validation_labels = \
-    split_out_validation_obs(train_images, train_labels, validation_frac)
 
 
 model = keras.Sequential([
@@ -219,7 +217,7 @@ history = model.fit(train_images,
                     train_labels,
                     epochs=20,
                     batch_size=128,
-                    validation_data=(validation_images, validation_labels))
+                    validation_split=.2)
 
 # measure accuracy against test data
 test_loss, test_acc = model.evaluate(test_images, test_labels)
