@@ -8,7 +8,7 @@ import matplotlib.ticker as ticker
 import pandas as pd
 import mpld3
 
-# turn off tensorflow info messages about e.g. cpu optimization features (turn
+# turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 # no scientific notation
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
@@ -33,12 +33,12 @@ def prep_data(train_images, test_images):
 
     return train_images,test_images
 
-def value_counts_np(np_array, sort_by_count=True):
+def value_counts_np(np_array, sort_by_counts=True):
     value_counts = np.unique(np_array, return_counts=True)
     value_counts = pd.Series(data=value_counts[1], index=value_counts[0])
     value_counts.name = 'Value Counts'
 
-    if sort_by_count:
+    if sort_by_counts:
         value_counts.sort_values(ascending=False, inplace=True)
 
     return value_counts
@@ -198,6 +198,7 @@ validation_frac = .2
 # todo play with builtin metadata tools
 # todo plot benchmark line on accuracy graphs
 # todo try k-fold cross validation
+# todo when needed on other data, figure out the intuition behind fit_transform on training, transform on test
 
 (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 train_images, test_images = prep_data(train_images, test_images)
