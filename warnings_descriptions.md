@@ -19,3 +19,10 @@
 ### `I tensorflow/core/common_runtime/gpu/gpu_device.cc:1525] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 6646 MB memory:  -> device: 0, name: NVIDIA GeForce RTX 2070, pci bus id: 0000:01:00.0, compute capability: 7.5`
 - Gives info about the BPU being used
 ### Impact: None
+
+### CUDA_ERROR_NO_DEVICE
+### `E tensorflow/stream_executor/cuda/cuda_driver.cc:271] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected`
+- The intention of this warning is to warn that no CUDA capable devices (i.e. GPUs) are seen by tensorflow
+- Using `os.environ['CUDA_VISIBLE_DEVICES'] = ""` to force tensorflow to use the CPU AND have reproducibility causes this warning
+- setting `CUDA_VISIBLE_DEVICES` to "-1" also forces tensorflow to use the CPU, but for some reason reproducibility is lost
+- ### Impact: None
