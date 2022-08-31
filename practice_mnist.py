@@ -224,7 +224,7 @@ model = keras.Sequential([
     layers.Dense(10, activation="softmax")
 ])
 
-model.compile(optimizer="rmsprop",
+model.compile(optimizer=keras.optimizers.RMSprop(),
               loss="sparse_categorical_crossentropy",
               metrics=["accuracy"])
 
