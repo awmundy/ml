@@ -261,7 +261,6 @@ def write_report(model, fail_images, fail_dist, pred_accuracy, history):
 
 
 # todo write data assertions and wrap in a function (e.g. output layer has same # of nodes as # of categories)
-# todo play with builtin metadata tools
 # todo plot benchmark line on accuracy graphs
 # todo try k-fold cross validation
 # todo when needed on other data, figure out the intuition behind fit_transform on training, transform on test
@@ -286,23 +285,13 @@ history = model.fit(train_data,
                     epochs=3,
                     batch_size=128,
                     validation_split=.2)
-model.summary()
 
-# measure accuracy against test data
 pred_loss, pred_accuracy = model.evaluate(test_data, test_labels)
 
+
+# report
 pred_labels = get_predicted_labels(model, test_data)
 fail_images, fail_dist = get_failing_predictions(pred_labels, test_data, test_labels)
 write_report(model, fail_images, fail_dist, pred_accuracy, history)
 
 
-
-
-# todo
-# checkpoint callbacks
-# graph training progress
-# record spec used
-# metadata elements
-#   - n training, test, validation datasets
-#   - dimensions of an observation (if relevant)
-#   - train acc, test acc
