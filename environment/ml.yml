@@ -15,6 +15,7 @@ dependencies:
   - pandas
   - plotly
   - python
+  - pydot
   - scikit-learn
   - scipy
   - tensorflow-gpu
