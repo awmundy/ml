@@ -10,6 +10,8 @@ import pandas as pd
 import mpld3
 from numpy.random import seed as np_seed
 from random import seed as python_seed
+import base64
+
 
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -207,6 +209,57 @@ def print_processor_type():
     else:
         print('Using CPU')
 
+def write_model_graph(model, out_path):
+    keras.utils.plot_model(model,
+                           to_file=out_path,
+                           show_shapes=True,
+                           show_dtype=True,
+                           show_layer_activations=True)
+
+def get_predicted_labels(model, test_data):
+    pred = model.predict(test_data)
+    pred_labels = []
+    for idx, obs in enumerate(pred):
+        pred_labels += [np.argmax(obs)]
+    return pred_labels
+
+def get_failing_predictions(pred_labels, test_data, test_labels):
+    fail_idxs = np.nonzero(pred_labels != test_labels)[0]
+    fail_labels = test_labels[fail_idxs]
+    fail_data = test_data[fail_idxs]
+    fail_dist = value_counts_np(fail_labels)
+    return fail_data, fail_dist
+
+def read_model_graph_as_html(model_graph_path):
+    data_uri = base64.b64encode(open(model_graph_path, 'rb').read()).decode('utf-8')
+    html_graph = '<img src="data:image/png;base64,{0}">'.format(data_uri)
+
+    return html_graph
+
+def write_report(model, fail_images, fail_dist, pred_accuracy, history):
+
+    report_path = os.path.expanduser('~/Desktop/test2.html')
+    model_graph_path = os.path.expanduser('~/Desktop/graph.png')
+    write_model_graph(model, model_graph_path)
+
+    if os.path.exists(report_path):
+        os.remove(report_path)
+    html_graph = read_model_graph_as_html(model_graph_path)
+    html_fail_counts = build_fail_counts_html(fail_dist, pred_accuracy,)
+    html_accuracy = build_training_plot_html(history, 'accuracy')
+    html_loss = build_training_plot_html(history, 'loss')
+    html_fail_images = build_fail_images_plot_html(fail_images)
+
+    with open(report_path, 'a') as report:
+        report.write(html_accuracy)
+        report.write(html_loss)
+        report.write(html_fail_images)
+        report.write(html_fail_counts)
+        report.write(html_graph)
+        report.close()
+        print('done writing report')
+
+
 # todo write data assertions and wrap in a function (e.g. output layer has same # of nodes as # of categories)
 # todo play with builtin metadata tools
 # todo plot benchmark line on accuracy graphs
@@ -215,9 +268,8 @@ def print_processor_type():
 
 use_cpu_and_make_results_reproducible()
 print_processor_type()
-(train_images, train_labels), (test_images, test_labels) = mnist.load_data()
-train_images, test_images = prep_data(train_images, test_images)
-
+(train_data, train_labels), (test_data, test_labels) = mnist.load_data()
+train_data, test_data = prep_data(train_data, test_data)
 
 model = keras.Sequential([
     layers.Dense(512, activation="relu"),
@@ -228,42 +280,21 @@ model.compile(optimizer=keras.optimizers.RMSprop(),
               loss="sparse_categorical_crossentropy",
               metrics=["accuracy"])
 
-history = model.fit(train_images,
+history = model.fit(train_data,
                     train_labels,
                     shuffle=False,
-                    epochs=5,
+                    epochs=3,
                     batch_size=128,
                     validation_split=.2)
+model.summary()
 
 # measure accuracy against test data
-test_loss, test_acc = model.evaluate(test_images, test_labels)
+pred_loss, pred_accuracy = model.evaluate(test_data, test_labels)
 
-pred = model.predict(test_images)
-pred_labels = []
-for idx, obs in enumerate(pred):
-    pred_labels += [np.argmax(obs)]
+pred_labels = get_predicted_labels(model, test_data)
+fail_images, fail_dist = get_failing_predictions(pred_labels, test_data, test_labels)
+write_report(model, fail_images, fail_dist, pred_accuracy, history)
 
-fail_idxs = np.nonzero(pred_labels != test_labels)[0]
-fail_labels = test_labels[fail_idxs]
-fail_images = test_images[fail_idxs]
-fail_dist = value_counts_np(fail_labels)
-pred_accuracy = 1 - len(fail_idxs) / len(test_images)
-
-
-
-out_path = os.path.expanduser('~/Desktop/test2.html')
-html_fail_counts = build_fail_counts_html(fail_dist, pred_accuracy,)
-html_accuracy = build_training_plot_html(history, 'accuracy')
-html_loss = build_training_plot_html(history, 'loss')
-html_fail_images = build_fail_images_plot_html(fail_images)
-
-with open(out_path, 'a') as report:
-    report.write(html_accuracy)
-    report.write(html_loss)
-    report.write(html_fail_images)
-    report.write(html_fail_counts)
-    report.close()
-    print('done')
 
 
 
