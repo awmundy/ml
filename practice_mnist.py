@@ -240,6 +240,16 @@ def write_model_graph(model, out_path):
                            show_dtype=True,
                            show_layer_activations=True)
 
+def write_confusion_matrix_heatmap(test_labels, pred_labels, out_path):
+    conf = sk_metrics.confusion_matrix(test_labels, pred_labels)
+    row_col_names = sorted(np.unique(test_labels))
+    conf = pd.DataFrame(conf, row_col_names, row_col_names)
+
+    fig = plt.figure(figsize = (7, 7))
+    sn.heatmap(conf, annot=True, fmt='d')
+    plt.savefig(out_path)
+
+
 def get_predicted_labels(model, test_data):
     pred = model.predict(test_data)
     pred_labels = []
@@ -254,27 +264,14 @@ def get_failing_predictions(pred_labels, test_data, test_labels):
     fail_dist = value_counts_np(fail_labels)
     return fail_data, fail_dist
 
-def read_model_graph_as_html(model_graph_path):
-    data_uri = base64.b64encode(open(model_graph_path, 'rb').read()).decode('utf-8')
+def read_image_as_html(image_path, image_title=None):
+    data_uri = base64.b64encode(open(image_path, 'rb').read()).decode('utf-8')
     html = f"""
         <br>
-        <h2>Model Graph</h2>
+        <h2>{image_title}</h2>
         <img src="data:image/png;base64,{data_uri}">
         <br>
     """
-    # html_graph = '''<img src="data:image/png;base64,{0}">'''.format(data_uri)
-    return html
-
-def build_confusion_matrix_heatmap_html(test_labels, pred_labels):
-    conf = sk_metrics.confusion_matrix(test_labels, pred_labels)
-    row_col_names = sorted(np.unique(test_labels))
-    conf = pd.DataFrame(conf, row_col_names, row_col_names)
-
-    fig = plt.figure(figsize = (7, 7))
-    sn.heatmap(conf, annot=True, fmt='d')
-    # todo figure out why y axis ticks are cut off in html
-    html = mpld3.fig_to_html(fig)
-
     return html
 
 def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
@@ -282,18 +279,20 @@ def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
 
     report_path = output_paths['report']
     model_graph_path = output_paths['model_graph']
+    confusion_heatmap_path = output_paths['confusion_heatmap']
     training_log_path = output_paths['training_log']
     write_model_graph(model, model_graph_path)
+    write_confusion_matrix_heatmap(test_labels, pred_labels, confusion_heatmap_path)
 
     if os.path.exists(report_path):
         os.remove(report_path)
-    html_model_graph = read_model_graph_as_html(model_graph_path)
+    html_model_graph = read_image_as_html(model_graph_path, 'Model Graph')
     html_fail_counts = build_fail_counts_html(fail_dist, pred_accuracy)
     html_accuracy = build_training_plot_html(history, 'accuracy')
     html_loss = build_training_plot_html(history, 'loss')
     html_fail_images = build_fail_images_plot_html(fail_images)
     training_log = build_training_log_html(training_log_path)
-    confusion_matrix = build_confusion_matrix_heatmap_html(test_labels, pred_labels)
+    confusion_heatmap = read_image_as_html(confusion_heatmap_path, 'Confusion Matrix')
 
     with open(report_path, 'a') as report:
         report.write(html_accuracy)
@@ -302,13 +301,14 @@ def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
         report.write(html_model_graph)
         report.write(html_fail_counts)
         report.write(html_fail_images)
-        report.write(confusion_matrix)
+        report.write(confusion_heatmap)
         report.close()
         print('done writing report')
 
 usr_path = os.path.expanduser('~/')
 output_paths = {'training_log': f'{usr_path}/Desktop/training_log.csv',
                 'model_graph': f'{usr_path}/Desktop/model_graph.png',
+                'confusion_heatmap': f'{usr_path}/Desktop/confusion_heatmap.png',
                 'report': f'{usr_path}/Desktop/test2.html'
                 }
 
