@@ -11,6 +11,8 @@ import mpld3
 from numpy.random import seed as np_seed
 from random import seed as python_seed
 import base64
+import sklearn.metrics as sk_metrics
+import seaborn as sn
 
 
 # turn off tensorflow info messages about e.g. cpu optimization features
@@ -263,7 +265,20 @@ def read_model_graph_as_html(model_graph_path):
     # html_graph = '''<img src="data:image/png;base64,{0}">'''.format(data_uri)
     return html
 
-def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, history):
+def build_confusion_matrix_heatmap_html(test_labels, pred_labels):
+    conf = sk_metrics.confusion_matrix(test_labels, pred_labels)
+    row_col_names = sorted(np.unique(test_labels))
+    conf = pd.DataFrame(conf, row_col_names, row_col_names)
+
+    fig = plt.figure(figsize = (7, 7))
+    sn.heatmap(conf, annot=True, fmt='d')
+    # todo figure out why y axis ticks are cut off in html
+    html = mpld3.fig_to_html(fig)
+
+    return html
+
+def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
+                 history, test_labels, pred_labels):
 
     report_path = output_paths['report']
     model_graph_path = output_paths['model_graph']
@@ -278,6 +293,7 @@ def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, his
     html_loss = build_training_plot_html(history, 'loss')
     html_fail_images = build_fail_images_plot_html(fail_images)
     training_log = build_training_log_html(training_log_path)
+    confusion_matrix = build_confusion_matrix_heatmap_html(test_labels, pred_labels)
 
     with open(report_path, 'a') as report:
         report.write(html_accuracy)
@@ -286,6 +302,7 @@ def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, his
         report.write(html_model_graph)
         report.write(html_fail_counts)
         report.write(html_fail_images)
+        report.write(confusion_matrix)
         report.close()
         print('done writing report')
 
@@ -328,6 +345,6 @@ pred_loss, pred_accuracy = model.evaluate(test_data, test_labels)
 # report
 pred_labels = get_predicted_labels(model, test_data)
 fail_images, fail_dist = get_failing_predictions(pred_labels, test_data, test_labels)
-write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, history)
+write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, history, test_labels, pred_labels)
 
 
