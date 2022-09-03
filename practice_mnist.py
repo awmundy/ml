@@ -13,6 +13,7 @@ from random import seed as python_seed
 import base64
 import sklearn.metrics as sk_metrics
 import seaborn as sn
+from keras import backend as keras_backend
 
 
 # turn off tensorflow info messages about e.g. cpu optimization features
@@ -312,6 +313,76 @@ output_paths = {'training_log': f'{usr_path}/Desktop/training_log.csv',
                 'report': f'{usr_path}/Desktop/test2.html'
                 }
 
+def get_node_values_and_params(model, model_input_data):
+    '''
+    params:
+        model: keras model object
+        model_input_data: the data to feed into the model, e.g. test data, training data, etc
+
+    Node values for a given layer do not appear to be stored anywhere.
+    To derive them, the data from the previous layer need to be passed to the
+    layer of interest, and the node values then recorded.
+
+    Weights and biases can be extracted without passing data to the layer
+
+    '''
+    val_df_list = []
+    weight_df_list = []
+    bias_df_list = []
+
+    # for the first round, the layer_input_data is just the data fed into the model
+    layer_input_data = model_input_data
+
+    # The input layer does not count as a layer, so the first hidden layer is layer 0
+    for layer_number in range(len(model.layers)):
+
+        # these are tensors representing the structure of the input and output
+        # data for the layer
+        input_tensor = model.layers[layer_number].input
+        output_tensor = model.layers[layer_number].output
+
+        # returns a function that takes input data for the layer and returns an
+        # np array of the node values
+        get_layer_output = keras_backend.function([input_tensor], [output_tensor])
+
+        # get the node values given the input from the previous layer
+        output = get_layer_output(layer_input_data)
+        # # unwrap from outer list for easier inspection
+        output = output[0]
+
+        # construct df of node values
+        node_labels = ['node_' + str(x) for x in range(len(output[0]))]
+        val_df = pd.DataFrame(columns=node_labels, data=output)
+        val_df.insert(0, 'obs', range(len(val_df)))
+        val_df['layer'] = layer_number
+        val_df_list += [val_df]
+
+        # retrieve the weights and biases for the layer
+        params = model.layers[layer_number].get_weights()
+
+        # For a dense layer, there is one weight array per feature in the layer before it. Each weight
+        # array has one weight per node in the layer.
+        # Ex: For MNIST there are 784 features (pixels), so there are 784 weight arrays in the
+        # first hidden layer.
+        # If this hidden layer has 20 nodes, each weight array will be length 20.
+        # The total number of weights is therfore:
+        #       (# of featuers in the preceding layer * number of nodes in the layer)
+        weights = params[0]
+        weight_df = pd.DataFrame(columns=node_labels, data=weights)
+        weight_df.insert(0, 'previous_layer_node', range(len(weight_df)))
+        weight_df['layer'] = layer_number
+        weight_df_list += [weight_df]
+
+        # 1 bias value per node in the layer, so length == number of nodes in the layer
+        biases = params[1]
+        bias_df = pd.DataFrame(columns=node_labels, data=[biases])
+        bias_df['layer'] = layer_number
+        bias_df_list += [bias_df]
+
+        # reset the layer_input_data for next round
+        layer_input_data = output
+
+    return val_df_list, weight_df_list, bias_df_list
 # todo write data assertions and wrap in a function (e.g. output layer has same # of nodes as # of categories)
 # todo plot benchmark line on accuracy graphs
 # todo try k-fold cross validation
@@ -323,8 +394,8 @@ print_processor_type()
 train_data, test_data = prep_data(train_data, test_data)
 
 model = keras.Sequential([
-    layers.Dense(512, activation="relu"),
-    layers.Dense(10, activation="softmax")
+    layers.Dense(20, activation="relu"),
+    layers.Dense(15, activation="softmax")
 ])
 
 model.compile(optimizer=keras.optimizers.RMSprop(),
@@ -334,7 +405,7 @@ model.compile(optimizer=keras.optimizers.RMSprop(),
 history = model.fit(train_data,
                     train_labels,
                     shuffle=False,
-                    epochs=3,
+                    epochs=1,
                     batch_size=128,
                     validation_split=.2,
                     callbacks=keras.callbacks.CSVLogger(output_paths['training_log']))
@@ -347,4 +418,4 @@ pred_labels = get_predicted_labels(model, test_data)
 fail_images, fail_dist = get_failing_predictions(pred_labels, test_data, test_labels)
 write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, history, test_labels, pred_labels)
 
-
+# v, w, b = get_node_values_and_params(model, test_data)
