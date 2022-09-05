@@ -20,6 +20,7 @@ from keras import backend as keras_backend
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 # no scientific notation
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
+pd.set_option('display.float_format', lambda x: '%.6f' % x)
 
 def use_cpu_and_make_results_reproducible():
     # Makes GPU invisible to tensorflow
@@ -251,11 +252,14 @@ def write_confusion_matrix_heatmap(test_labels, pred_labels, out_path):
     plt.savefig(out_path)
 
 
-def get_predicted_labels(model, test_data):
+def get_predicted_labels(model, test_data, collapse_pred=True):
     pred = model.predict(test_data)
     pred_labels = []
     for idx, obs in enumerate(pred):
-        pred_labels += [np.argmax(obs)]
+        if collapse_pred:
+            pred_labels += [np.argmax(obs)]
+        else:
+            pred_labels += [obs]
     return pred_labels
 
 def get_failing_predictions(pred_labels, test_data, test_labels):
@@ -319,22 +323,30 @@ def get_node_values_and_params(model, model_input_data):
         model: keras model object
         model_input_data: the data to feed into the model, e.g. test data, training data, etc
 
-    Node values for a given layer do not appear to be stored anywhere.
-    To derive them, the data from the previous layer need to be passed to the
-    layer of interest, and the node values then recorded.
+    Collects node values, weights, and biases for each layer after the input layer.
+    Node values for a hidden layer are not stored anywhere in the model. To derive them,
+    the data from the previous layer need to be passed to the layer of interest, and
+    the node values then recorded. Weights and biases can be extracted without
+    passing data to the layer.
 
-    Weights and biases can be extracted without passing data to the layer
+    returns: dictionary where the keys are the layer number and the values are dictionaries
+             containing 3 dataframes for the values, weights, and biases respectively, i.e.
+             node_metrics = {'l0': {'values': df, 'weights': df, 'biases': df},
+                             'l1': {...},
+                              ... }
 
     '''
-    val_df_list = []
-    weight_df_list = []
-    bias_df_list = []
+
+    # output container
+    node_metrics = {}
 
     # for the first round, the layer_input_data is just the data fed into the model
     layer_input_data = model_input_data
 
     # The input layer does not count as a layer, so the first hidden layer is layer 0
     for layer_number in range(len(model.layers)):
+        layer_label = 'l' + str(layer_number)
+        node_metrics[layer_label] = {}
 
         # these are tensors representing the structure of the input and output
         # data for the layer
@@ -355,7 +367,7 @@ def get_node_values_and_params(model, model_input_data):
         val_df = pd.DataFrame(columns=node_labels, data=output)
         val_df.insert(0, 'obs', range(len(val_df)))
         val_df['layer'] = layer_number
-        val_df_list += [val_df]
+        node_metrics[layer_label]['values'] = val_df
 
         # retrieve the weights and biases for the layer
         params = model.layers[layer_number].get_weights()
@@ -365,24 +377,36 @@ def get_node_values_and_params(model, model_input_data):
         # Ex: For MNIST there are 784 features (pixels), so there are 784 weight arrays in the
         # first hidden layer.
         # If this hidden layer has 20 nodes, each weight array will be length 20.
-        # The total number of weights is therfore:
+        # The total number of weights is therefore:
         #       (# of featuers in the preceding layer * number of nodes in the layer)
         weights = params[0]
         weight_df = pd.DataFrame(columns=node_labels, data=weights)
         weight_df.insert(0, 'previous_layer_node', range(len(weight_df)))
         weight_df['layer'] = layer_number
-        weight_df_list += [weight_df]
+        node_metrics[layer_label]['weights'] = weight_df
 
-        # 1 bias value per node in the layer, so length == number of nodes in the layer
+        # 1 bias value per node in the layer, so biases length == number of nodes in the layer
         biases = params[1]
         bias_df = pd.DataFrame(columns=node_labels, data=[biases])
         bias_df['layer'] = layer_number
-        bias_df_list += [bias_df]
+        node_metrics[layer_label]['biases'] = bias_df
 
         # reset the layer_input_data for next round
         layer_input_data = output
 
-    return val_df_list, weight_df_list, bias_df_list
+    # QA
+    # get the predicted labels (as probabilities) using model.predict
+    pred_label_probabilities = get_predicted_labels(model, model_input_data, collapse_pred=False)
+    pred_df = pd.DataFrame(columns=node_labels, data=pred_label_probabilities)
+
+    # qa the output layer produced from this function against the output from model.predict
+    output_layer_number = len(model.layers) - 1
+    qa_df = node_metrics[f'l{output_layer_number}']['values'].copy()
+    qa_df = qa_df[[x for x in pred_df]]
+    pd.testing.assert_frame_equal(pred_df, qa_df)
+
+    return node_metrics
+
 # todo write data assertions and wrap in a function (e.g. output layer has same # of nodes as # of categories)
 # todo plot benchmark line on accuracy graphs
 # todo try k-fold cross validation
@@ -418,4 +442,4 @@ pred_labels = get_predicted_labels(model, test_data)
 fail_images, fail_dist = get_failing_predictions(pred_labels, test_data, test_labels)
 write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, history, test_labels, pred_labels)
 
-# v, w, b = get_node_values_and_params(model, test_data)
+node_metrics = get_node_values_and_params(model, test_data)
