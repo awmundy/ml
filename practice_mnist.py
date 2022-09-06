@@ -27,7 +27,7 @@ def use_cpu_and_make_results_reproducible():
     os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
     # set python, numpy and tensorflow seeds so that operations
-    #   involving randomness can be reperformed consistently
+    # involving randomness can be reperformed consistently
     os.environ['PYTHONHASHSEED'] = "1"
     python_seed(1)
 
@@ -317,21 +317,21 @@ output_paths = {'training_log': f'{usr_path}/Desktop/training_log.csv',
                 'report': f'{usr_path}/Desktop/test2.html'
                 }
 
-def get_node_values_and_params(model, model_input_data):
+def get_node_activations_and_params(model, model_input_data):
     '''
     params:
         model: keras model object
         model_input_data: the data to feed into the model, e.g. test data, training data, etc
 
-    Collects node values, weights, and biases for each layer after the input layer.
-    Node values for a hidden layer are not stored anywhere in the model. To derive them,
+    Collects node activations, weights, and biases for each layer after the input layer.
+    Node activations for a hidden layer are not stored anywhere in the model. To derive them,
     the data from the previous layer need to be passed to the layer of interest, and
-    the node values then recorded. Weights and biases can be extracted without
+    the node activations then recorded. Weights and biases can be extracted without
     passing data to the layer.
 
-    returns: dictionary where the keys are the layer number and the values are dictionaries
-             containing 3 dataframes for the values, weights, and biases respectively, i.e.
-             node_metrics = {'l0': {'values': df, 'weights': df, 'biases': df},
+    returns: dictionary where the keys are the layer number and the activations are dictionaries
+             containing 3 dataframes for the activations, weights, and biases respectively, i.e.
+             node_metrics = {'l0': {'activations': df, 'weights': df, 'biases': df},
                              'l1': {...},
                               ... }
 
@@ -354,20 +354,20 @@ def get_node_values_and_params(model, model_input_data):
         output_tensor = model.layers[layer_number].output
 
         # returns a function that takes input data for the layer and returns an
-        # np array of the node values
+        # np array of the node activations
         get_layer_output = keras_backend.function([input_tensor], [output_tensor])
 
-        # get the node values given the input from the previous layer
+        # get the node activations given the input from the previous layer
         output = get_layer_output(layer_input_data)
         # # unwrap from outer list for easier inspection
         output = output[0]
 
-        # construct df of node values
+        # construct df of node activations
         node_labels = ['node_' + str(x) for x in range(len(output[0]))]
-        val_df = pd.DataFrame(columns=node_labels, data=output)
-        val_df.insert(0, 'obs', range(len(val_df)))
-        val_df['layer'] = layer_number
-        node_metrics[layer_label]['values'] = val_df
+        act_df = pd.DataFrame(columns=node_labels, data=output)
+        act_df.insert(0, 'obs', range(len(act_df)))
+        act_df['layer'] = layer_number
+        node_metrics[layer_label]['activations'] = act_df
 
         # retrieve the weights and biases for the layer
         params = model.layers[layer_number].get_weights()
@@ -378,7 +378,7 @@ def get_node_values_and_params(model, model_input_data):
         # first hidden layer.
         # If this hidden layer has 20 nodes, each weight array will be length 20.
         # The total number of weights is therefore:
-        #       (# of featuers in the preceding layer * number of nodes in the layer)
+        #       (# of features in the preceding layer * number of nodes in the layer)
         weights = params[0]
         weight_df = pd.DataFrame(columns=node_labels, data=weights)
         weight_df.insert(0, 'previous_layer_node', range(len(weight_df)))
@@ -401,7 +401,7 @@ def get_node_values_and_params(model, model_input_data):
 
     # qa the output layer produced from this function against the output from model.predict
     output_layer_number = len(model.layers) - 1
-    qa_df = node_metrics[f'l{output_layer_number}']['values'].copy()
+    qa_df = node_metrics[f'l{output_layer_number}']['activations'].copy()
     qa_df = qa_df[[x for x in pred_df]]
     pd.testing.assert_frame_equal(pred_df, qa_df)
 
@@ -442,4 +442,4 @@ pred_labels = get_predicted_labels(model, test_data)
 fail_images, fail_dist = get_failing_predictions(pred_labels, test_data, test_labels)
 write_report(output_paths, model, fail_images, fail_dist, pred_accuracy, history, test_labels, pred_labels)
 
-node_metrics = get_node_values_and_params(model, test_data)
+node_metrics = get_node_activations_and_params(model, test_data)
