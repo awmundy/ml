@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import requests
+import statsmodels.api as sm
+
 
 def download_data():
 
@@ -34,3 +36,52 @@ def download_data():
         with open(out_path, 'wb') as output_location:
             output_location.write(res.content)
             print(f'done downloading {out_path}')
+
+def alter_dtypes(df):
+    float_cols = ['price', 'sqft']
+    for col in float_cols:
+        df[col] = df[col].astype(float)
+
+    return df
+
+# todo if i want to use the vacancy/occupancy data, would have to format it first
+# todo run ols as benchmark
+
+download_data()
+
+df = pd.read_excel('/home/amundy/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
+df.columns = df.columns.str.lower()
+df = alter_dtypes(df)
+# explanatory variables
+# region: Census region, "USA" region (5) for a small subset of homes, [1, 2, 3, 4, 5]
+# section: Size of home, [1, 2, 3]
+# finaldest: Whether home is placed at final destination, [1, 2]
+# sqft: Square footage, with winsorization [rounded winsorized sqft]
+# bedrooms: Number of bedrooms, 2 or less, 3 or more, na or privacy  [1, 2, 9]
+# location: Inside manuf. home community, outside, na or privacy [1, 3, 9]
+# footings: Type of footings, [1, 2, 3, 4, 5, 9]
+# piers: Type of piers, partially dependent on footings, [0, 1, 2, 3, 4, 9]
+# secured: How it is secured, partially dependent on footings, [0, 1, 2, 3, 9]
+
+# lots of the data is imputed
+
+
+
+
+categorical_cols = ['region']
+for col in categorical_cols:
+    dum = pd.get_dummies(df[col], prefix=col)
+    dum.drop(dum.columns[-1], axis=1, inplace=True) # drop last one to handle collinearity
+    df = pd.concat([df, dum], axis=1)
+
+df['constant'] = 1
+
+X_cols = ['constant', 'sqft'] + [x for x in df if 'region_' in x]
+# X_cols = ['constant', 'sqft']
+X = df[X_cols].copy()
+y = df['price'].copy()
+
+# ols
+model = sm.OLS(y, X)
+res = model.fit()
+res.summary()
