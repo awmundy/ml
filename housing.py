@@ -75,22 +75,21 @@ def split_to_train_test_and_data_labels(df, test_frac, outcome_var):
 
     return train_data, train_labels, test_data, test_labels
 
-def build_prediction_accuracy_html(pred_accuracy):
+def build_prediction_error_html(pred_error):
     html =  f"""
     <html>
       <head>
       </head>
       <body>
-        <h2>Training Log</h2>
-        {pred_accuracy}
+        <h2>Prediction Error</h2>
+        {pred_error}
       </body>
     </html>
     """
 
     return html
 
-def write_report(output_paths, model, pred_accuracy, history, metric):
-    #todo write predicted accuracy
+def write_report(output_paths, model, pred_error, history, metric):
 
     report_path = output_paths['report']
     model_graph_path = output_paths['model_graph']
@@ -103,14 +102,14 @@ def write_report(output_paths, model, pred_accuracy, history, metric):
     html_accuracy = shared.build_training_plot_html(history, metric)
     html_loss = shared.build_training_plot_html(history, 'loss')
     training_log = shared.build_training_log_html(training_log_path)
-    pred_acc = build_prediction_accuracy_html(pred_accuracy)
+    pred_er = build_prediction_error_html(pred_error)
 
     with open(report_path, 'a') as report:
         report.write(html_accuracy)
         report.write(html_loss)
         report.write(training_log)
+        report.write(pred_er)
         report.write(html_model_graph)
-        report.write(pred_acc)
         report.close()
         print('done writing report')
 
@@ -149,7 +148,8 @@ train_data, train_labels, test_data, test_labels = \
 # lots of the data is imputed
 
 X_cols = ['constant', 'sqft'] + [x for x in df if 'region_' in x]
-X = train_data[X_cols].copy()
+train_data = train_data[X_cols].copy()
+test_data = test_data[X_cols]
 y = train_labels.copy()
 
 # ols
@@ -158,7 +158,11 @@ res = model.fit()
 res.summary()
 ols_pred = res.predict(test_data[X_cols])
 
+
 model = keras.Sequential([
+    layers.Dense(64, activation='relu'),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(64, activation='relu'),
     layers.Dense(64, activation='relu'),
     layers.Dense(1)
     ])
@@ -170,11 +174,11 @@ model.compile(optimizer=keras.optimizers.RMSprop(),
 history = model.fit(train_data[X_cols],
                     train_labels,
                     shuffle=False,
-                    epochs=5,
-                    batch_size=128,
+                    epochs=20,
+                    batch_size=32,
                     validation_split=.2,
                     callbacks=keras.callbacks.CSVLogger(output_paths['training_log'])
                     )
 
-pred_loss, pred_accuracy = model.evaluate(test_data[X_cols], test_labels)
-write_report(output_paths, model, pred_accuracy, history, 'mae')
+pred_loss, pred_error = model.evaluate(test_data[X_cols], test_labels)
+write_report(output_paths, model, pred_error, history, 'mae')
