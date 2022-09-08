@@ -5,7 +5,6 @@ from tensorflow import keras
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import pandas as pd
 import mpld3
 from numpy.random import seed as np_seed
@@ -14,7 +13,7 @@ import base64
 import sklearn.metrics as sk_metrics
 import seaborn as sn
 from keras import backend as keras_backend
-
+import ml.shared as shared
 
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -63,36 +62,6 @@ def value_counts_np(np_array, sort_by_counts=True):
         value_counts.sort_values(ascending=False, inplace=True)
 
     return value_counts
-
-def get_history_df(history, pretty_cols=False):
-
-    history_df = pd.DataFrame(history.history)
-    history_df.insert(0, 'epoch', range(1, len(history_df) + 1))
-
-    if pretty_cols:
-        for col in [x for x in history_df if x != 'epoch']:
-            history_df[col] = round(history_df[col] * 100, 3).astype(str).str.ljust(5, '0') + '%'
-    
-    return history_df
-
-def build_training_log_html(training_log_path):
-    log = pd.read_csv(training_log_path, dtype=float)
-    html =  f"""
-    <html>
-      <head>
-      </head>
-      <body>
-        <h2>Training Log</h2>
-        <table style="width:100">
-            <tr>
-              <td>{log.to_html(index=False)}</td>
-            </tr>
-          </table>
-      </body>
-    </html>
-    """
-
-    return html
 
 def build_fail_counts_html(fail_dist, pred_accuracy):
 
@@ -167,47 +136,6 @@ def split_out_validation_obs(train_data, train_labels, validation_frac):
 
     return train_data, train_labels, validation_data, validation_labels
 
-def build_training_plot_html(history, plot_type):
-    df = get_history_df(history)
-
-    if plot_type == 'accuracy':
-        title = 'Training Accuracy'
-        y_col_1 = 'accuracy'
-        y_col_1_label = 'Training accuracy'
-        y_col_2 = 'val_accuracy'
-        y_col_2_label = 'Validation accuracy'
-    elif plot_type == 'loss':
-        title = 'Training Loss'
-        y_col_1 = 'loss'
-        y_col_1_label = 'Training loss'
-        y_col_2 = 'val_loss'
-        y_col_2_label = 'Validation loss'
-    else:
-        raise Exception(f'Invalid plot_type: {plot_type}')
-    
-    # todo implement side by side chart
-    # fig, ax = plt.subplots(1, 2, sharex="col", sharey="row", figsize=(8, 8))
-    # fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95,
-    #                     hspace=0.1, wspace=0.1)
-    
-    # instantiate figure
-    fig = plt.figure(figsize=(5,5))
-
-    # make y axis a percent
-    ax = fig.add_subplot(1,1,1)
-    ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1.0))
-
-    # plot
-    plt.plot(df['epoch'], df[y_col_1], "bo", label=y_col_1_label)
-    plt.plot(df['epoch'], df[y_col_2], "b", label=y_col_2_label)
-    plt.title(title)
-    plt.xlabel("Epochs")
-    plt.ylabel(plot_type)
-    plt.legend()
-
-    html = mpld3.fig_to_html(fig)
-
-    return html
 
 def build_fail_images_plot_html(fail_images):
     fail_images = fail_images.copy()
@@ -234,13 +162,6 @@ def print_processor_type():
         print('Using GPU')
     else:
         print('Using CPU')
-
-def write_model_graph(model, out_path):
-    keras.utils.plot_model(model,
-                           to_file=out_path,
-                           show_shapes=True,
-                           show_dtype=True,
-                           show_layer_activations=True)
 
 def write_confusion_matrix_heatmap(test_labels, pred_labels, out_path):
     conf = sk_metrics.confusion_matrix(test_labels, pred_labels)
@@ -269,16 +190,6 @@ def get_failing_predictions(pred_labels, test_data, test_labels):
     fail_dist = value_counts_np(fail_labels)
     return fail_data, fail_dist
 
-def read_image_as_html(image_path, image_title=None):
-    data_uri = base64.b64encode(open(image_path, 'rb').read()).decode('utf-8')
-    html = f"""
-        <br>
-        <h2>{image_title}</h2>
-        <img src="data:image/png;base64,{data_uri}">
-        <br>
-    """
-    return html
-
 def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
                  history, test_labels, pred_labels):
 
@@ -286,18 +197,18 @@ def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
     model_graph_path = output_paths['model_graph']
     confusion_heatmap_path = output_paths['confusion_heatmap']
     training_log_path = output_paths['training_log']
-    write_model_graph(model, model_graph_path)
+    shared.write_model_graph(model, model_graph_path)
     write_confusion_matrix_heatmap(test_labels, pred_labels, confusion_heatmap_path)
 
     if os.path.exists(report_path):
         os.remove(report_path)
-    html_model_graph = read_image_as_html(model_graph_path, 'Model Graph')
+    html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
     html_fail_counts = build_fail_counts_html(fail_dist, pred_accuracy)
-    html_accuracy = build_training_plot_html(history, 'accuracy')
-    html_loss = build_training_plot_html(history, 'loss')
+    html_accuracy = shared.build_training_plot_html(history, 'accuracy')
+    html_loss = shared.build_training_plot_html(history, 'loss')
     html_fail_images = build_fail_images_plot_html(fail_images)
-    training_log = build_training_log_html(training_log_path)
-    confusion_heatmap = read_image_as_html(confusion_heatmap_path, 'Confusion Matrix')
+    training_log = shared.build_training_log_html(training_log_path)
+    confusion_heatmap = shared.read_image_as_html(confusion_heatmap_path, 'Confusion Matrix')
 
     with open(report_path, 'a') as report:
         report.write(html_accuracy)
@@ -309,13 +220,6 @@ def write_report(output_paths, model, fail_images, fail_dist, pred_accuracy,
         report.write(confusion_heatmap)
         report.close()
         print('done writing report')
-
-usr_path = os.path.expanduser('~/')
-output_paths = {'training_log': f'{usr_path}/Desktop/training_log.csv',
-                'model_graph': f'{usr_path}/Desktop/model_graph.png',
-                'confusion_heatmap': f'{usr_path}/Desktop/confusion_heatmap.png',
-                'report': f'{usr_path}/Desktop/test2.html'
-                }
 
 def get_node_activations_and_params(model, model_input_data):
     '''
@@ -411,6 +315,13 @@ def get_node_activations_and_params(model, model_input_data):
 # todo plot benchmark line on accuracy graphs
 # todo try k-fold cross validation
 # todo when needed on other data, figure out the intuition behind fit_transform on training, transform on test
+
+usr_path = os.path.expanduser('~/')
+output_paths = {'training_log': f'{usr_path}/Desktop/training_log.csv',
+                'model_graph': f'{usr_path}/Desktop/model_graph.png',
+                'confusion_heatmap': f'{usr_path}/Desktop/confusion_heatmap.png',
+                'report': f'{usr_path}/Desktop/test2.html'
+                }
 
 use_cpu_and_make_results_reproducible()
 print_processor_type()
