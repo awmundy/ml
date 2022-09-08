@@ -62,7 +62,7 @@ def one_hot_categoricals(df):
 
 def split_to_train_test_and_data_labels(df, test_frac, outcome_var):
     # shuffle, set seed to make reproducible
-    df = df.sample(frac=1, random_state=1).reset_index()
+    df = df.sample(frac=1, random_state=1).reset_index(drop=True)
     train_data, test_data = train_test_split(df, test_size=test_frac)
     train_labels = train_data.pop(outcome_var)
     test_labels = test_data.pop(outcome_var)
