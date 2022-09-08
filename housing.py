@@ -7,8 +7,14 @@ import pandas as pd
 import requests
 import statsmodels.api as sm
 from sklearn.model_selection import train_test_split
+import numpy as np
 import ml.shared as shared
 
+# turn off tensorflow info messages about e.g. cpu optimization features
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+# no scientific notation
+np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
+pd.set_option('display.float_format', lambda x: '%.6f' % x)
 
 
 def download_data():
@@ -69,7 +75,21 @@ def split_to_train_test_and_data_labels(df, test_frac, outcome_var):
 
     return train_data, train_labels, test_data, test_labels
 
-def write_report(output_paths, model, pred_accuracy, history):
+def build_prediction_accuracy_html(pred_accuracy):
+    html =  f"""
+    <html>
+      <head>
+      </head>
+      <body>
+        <h2>Training Log</h2>
+        {pred_accuracy}
+      </body>
+    </html>
+    """
+
+    return html
+
+def write_report(output_paths, model, pred_accuracy, history, metric):
     #todo write predicted accuracy
 
     report_path = output_paths['report']
@@ -80,15 +100,17 @@ def write_report(output_paths, model, pred_accuracy, history):
     if os.path.exists(report_path):
         os.remove(report_path)
     html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
-    html_accuracy = shared.build_training_plot_html(history, 'accuracy')
+    html_accuracy = shared.build_training_plot_html(history, metric)
     html_loss = shared.build_training_plot_html(history, 'loss')
     training_log = shared.build_training_log_html(training_log_path)
+    pred_acc = build_prediction_accuracy_html(pred_accuracy)
 
     with open(report_path, 'a') as report:
         report.write(html_accuracy)
         report.write(html_loss)
         report.write(training_log)
         report.write(html_model_graph)
+        report.write(pred_acc)
         report.close()
         print('done writing report')
 
@@ -134,7 +156,7 @@ y = train_labels.copy()
 model = sm.OLS(y, X)
 res = model.fit()
 res.summary()
-ols_pred = res.predict(test_data)
+ols_pred = res.predict(test_data[X_cols])
 
 model = keras.Sequential([
     layers.Dense(64, activation='relu'),
@@ -145,7 +167,7 @@ model.compile(optimizer=keras.optimizers.RMSprop(),
               loss='mse',
               metrics=['mae'])
 
-history = model.fit(train_data,
+history = model.fit(train_data[X_cols],
                     train_labels,
                     shuffle=False,
                     epochs=5,
@@ -154,5 +176,5 @@ history = model.fit(train_data,
                     callbacks=keras.callbacks.CSVLogger(output_paths['training_log'])
                     )
 
-pred_loss, pred_accuracy = model.evaluate(test_data, test_labels)
-write_report(output_paths, model, pred_accuracy, history)
+pred_loss, pred_accuracy = model.evaluate(test_data[X_cols], test_labels)
+write_report(output_paths, model, pred_accuracy, history, 'mae')
