@@ -121,6 +121,7 @@ output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
 
 # todo if i want to use the vacancy/occupancy data, would have to format it first
 # todo run ols as benchmark
+# todo normalize data
 
 download_data()
 
@@ -149,14 +150,13 @@ train_data, train_labels, test_data, test_labels = \
 
 X_cols = ['constant', 'sqft'] + [x for x in df if 'region_' in x]
 train_data = train_data[X_cols].copy()
-test_data = test_data[X_cols]
-y = train_labels.copy()
+test_data = test_data[X_cols].copy()
 
 # ols
-model = sm.OLS(y, X)
+model = sm.OLS(train_labels, train_data)
 res = model.fit()
 res.summary()
-ols_pred = res.predict(test_data[X_cols])
+ols_pred = res.predict(test_data)
 
 
 model = keras.Sequential([
@@ -171,7 +171,7 @@ model.compile(optimizer=keras.optimizers.RMSprop(),
               loss='mse',
               metrics=['mae'])
 
-history = model.fit(train_data[X_cols],
+history = model.fit(train_data,
                     train_labels,
                     shuffle=False,
                     epochs=20,
@@ -180,5 +180,5 @@ history = model.fit(train_data[X_cols],
                     callbacks=keras.callbacks.CSVLogger(output_paths['training_log'])
                     )
 
-pred_loss, pred_error = model.evaluate(test_data[X_cols], test_labels)
+pred_loss, pred_error = model.evaluate(test_data, test_labels)
 write_report(output_paths, model, pred_error, history, 'mae')
