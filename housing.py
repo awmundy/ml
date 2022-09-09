@@ -185,8 +185,6 @@ output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
                 }
 
 # todo if i want to use the vacancy/occupancy data, would have to format it first
-# todo run ols as benchmark
-# todo normalize data
 # todo why does normalization cause convergence to take longer?
 
 
