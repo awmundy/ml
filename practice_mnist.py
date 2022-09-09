@@ -7,9 +7,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import mpld3
-from numpy.random import seed as np_seed
-from random import seed as python_seed
-import base64
 import sklearn.metrics as sk_metrics
 import seaborn as sn
 from keras import backend as keras_backend
@@ -20,19 +17,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 # no scientific notation
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
 pd.set_option('display.float_format', lambda x: '%.6f' % x)
-
-def use_cpu_and_make_results_reproducible():
-    # Makes GPU invisible to tensorflow
-    os.environ['CUDA_VISIBLE_DEVICES'] = ""
-
-    # set python, numpy and tensorflow seeds so that operations
-    # involving randomness can be reperformed consistently
-    os.environ['PYTHONHASHSEED'] = "1"
-    python_seed(1)
-
-    # numpy seed
-    np_seed(1)
-    tf.random.set_seed(2)
 
 def denormalize_images(images):
     images = images * 255
@@ -323,7 +307,7 @@ output_paths = {'training_log': f'{usr_path}/Desktop/training_log.csv',
                 'report': f'{usr_path}/Desktop/test2.html'
                 }
 
-use_cpu_and_make_results_reproducible()
+shared.use_cpu_and_make_results_reproducible()
 print_processor_type()
 (train_data, train_labels), (test_data, test_labels) = mnist.load_data()
 train_data, test_data = prep_data(train_data, test_data)

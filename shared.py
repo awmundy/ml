@@ -4,6 +4,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tensorflow import keras
 import matplotlib.ticker as ticker
+from numpy.random import seed as np_seed
+from random import seed as python_seed
+import os
+import tensorflow as tf
 
 
 def get_history_df(history, pretty_cols=False):
@@ -91,3 +95,16 @@ def write_model_graph(model, out_path):
                            show_shapes=True,
                            show_dtype=True,
                            show_layer_activations=True)
+
+def use_cpu_and_make_results_reproducible():
+    # Makes GPU invisible to tensorflow
+    os.environ['CUDA_VISIBLE_DEVICES'] = ""
+
+    # set python, numpy and tensorflow seeds so that operations
+    # involving randomness can be reperformed consistently
+    os.environ['PYTHONHASHSEED'] = "1"
+    python_seed(1)
+
+    # numpy seed
+    np_seed(1)
+    tf.random.set_seed(2)
