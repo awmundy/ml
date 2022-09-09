@@ -8,6 +8,7 @@ import requests
 import statsmodels.api as sm
 from sklearn.model_selection import train_test_split
 import numpy as np
+import pprint
 import ml.shared as shared
 
 # turn off tensorflow info messages about e.g. cpu optimization features
@@ -67,29 +68,43 @@ def one_hot_categoricals(df):
     return df
 
 def split_to_train_test_and_data_labels(df, test_frac, outcome_var):
-    # shuffle, set seed to make reproducible
-    df = df.sample(frac=1, random_state=1).reset_index(drop=True)
-    train_data, test_data = train_test_split(df, test_size=test_frac)
+    train_data, test_data = train_test_split(df, test_size=test_frac, random_state=1)
+    train_data.reset_index(drop=True, inplace=True)
+    test_data.reset_index(drop=True, inplace=True)
     train_labels = train_data.pop(outcome_var)
     test_labels = test_data.pop(outcome_var)
 
     return train_data, train_labels, test_data, test_labels
 
-def build_prediction_error_html(pred_error):
+def build_prediction_error_html(pred_error, ols_error):
     html =  f"""
     <html>
       <head>
       </head>
       <body>
-        <h2>Prediction Error</h2>
+        <h2>Neural Net Prediction Error</h2>
         {pred_error}
+        <h2>OLS Prediction Error</h2>
+        {ols_error}
       </body>
     </html>
     """
 
     return html
 
-def write_report(output_paths, model, pred_error, history, metric):
+def convert_dict_to_html(cfg):
+    html_lines = []
+    for line in pprint.pformat(cfg, sort_dicts=False).splitlines():
+        html_lines.append(f'<br/>{line}')
+    html = '\n'.join(html_lines)
+
+    return html
+
+def write_report(output_paths, model, pred_error, history, ols_error, cfg):
+
+    metric = cfg['metrics']
+    assert len(metric) == 1
+    metric = metric[0]
 
     report_path = output_paths['report']
     model_graph_path = output_paths['model_graph']
@@ -101,17 +116,37 @@ def write_report(output_paths, model, pred_error, history, metric):
     html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
     html_accuracy = shared.build_training_plot_html(history, metric)
     html_loss = shared.build_training_plot_html(history, 'loss')
-    training_log = shared.build_training_log_html(training_log_path)
-    pred_er = build_prediction_error_html(pred_error)
+    html_training_log = shared.build_training_log_html(training_log_path)
+    html_pred_error = build_prediction_error_html(pred_error, ols_error)
+    html_cfg = convert_dict_to_html(cfg)
 
     with open(report_path, 'a') as report:
+        report.write(html_cfg)
+        report.write(html_pred_error)
         report.write(html_accuracy)
         report.write(html_loss)
-        report.write(training_log)
-        report.write(pred_er)
+        report.write(html_training_log)
         report.write(html_model_graph)
         report.close()
         print('done writing report')
+
+def normalize(df, cols):
+    mean = df[cols].mean(axis=0)
+    df[cols] -= mean
+    std = df[cols].std(axis=0)
+    df[cols] /= std
+
+    return df
+
+def get_ols_error(train_labels, train_data, test_data):
+    model = sm.OLS(train_labels, train_data)
+    res = model.fit()
+    res.summary()
+    ols_pred = res.predict(test_data)
+    ols_error = (ols_pred - test_labels).sum() / len(ols_pred)
+
+    return ols_error
+
 
 usr_path = os.path.expanduser('~/')
 output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
@@ -122,19 +157,60 @@ output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
 # todo if i want to use the vacancy/occupancy data, would have to format it first
 # todo run ols as benchmark
 # todo normalize data
+# todo why does normalization cause convergence to take longer?
+
+
+cfg = {'layers': [['relu', 64],
+                  ['relu', 64],
+                  [None, 1]],
+       'epochs': 10,
+       'batch_size': 32,
+       'loss': 'mse',
+       'metrics': ['mae'],
+       'normalized_features': ['sqft']
+       }
 
 download_data()
-
 df = pd.read_excel('/home/amundy/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
 df['constant'] = 1
 df.columns = df.columns.str.lower()
 df = alter_dtypes(df)
 df = one_hot_categoricals(df)
 
-
 train_data, train_labels, test_data, test_labels = \
     split_to_train_test_and_data_labels(df, .2, 'price')
 
+
+features = ['constant', 'sqft'] + [x for x in df if 'region_' in x]
+cfg['features'] = features
+train_data = train_data[features].copy()
+test_data = test_data[features].copy()
+ols_error = get_ols_error(train_labels, train_data, test_data)
+
+if len(cfg['normalized_features']) > 0:
+    train_data = normalize(train_data, cfg['normalized_features'])
+
+model = keras.Sequential()
+for activation, size in cfg['layers']:
+    model.add(layers.Dense(size, activation=activation))
+
+model.compile(optimizer=keras.optimizers.RMSprop(),
+              loss=cfg['loss'],
+              metrics=cfg['metrics'])
+
+history = model.fit(train_data,
+                    train_labels,
+                    shuffle=False,
+                    epochs=cfg['epochs'],
+                    batch_size=cfg['batch_size'],
+                    validation_split=.2,
+                    callbacks=keras.callbacks.CSVLogger(output_paths['training_log'])
+                    )
+
+pred_loss, pred_error = model.evaluate(test_data, test_labels)
+write_report(output_paths, model, pred_error, history, ols_error, cfg)
+
+### NOTES ###
 # explanatory variables
 # region: Census region, "USA" region (5) for a small subset of homes, [1, 2, 3, 4, 5]
 # section: Size of home, [1, 2, 3]
@@ -145,40 +221,5 @@ train_data, train_labels, test_data, test_labels = \
 # footings: Type of footings, [1, 2, 3, 4, 5, 9]
 # piers: Type of piers, partially dependent on footings, [0, 1, 2, 3, 4, 9]
 # secured: How it is secured, partially dependent on footings, [0, 1, 2, 3, 9]
-
 # lots of the data is imputed
 
-X_cols = ['constant', 'sqft'] + [x for x in df if 'region_' in x]
-train_data = train_data[X_cols].copy()
-test_data = test_data[X_cols].copy()
-
-# ols
-model = sm.OLS(train_labels, train_data)
-res = model.fit()
-res.summary()
-ols_pred = res.predict(test_data)
-
-
-model = keras.Sequential([
-    layers.Dense(64, activation='relu'),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(1)
-    ])
-
-model.compile(optimizer=keras.optimizers.RMSprop(),
-              loss='mse',
-              metrics=['mae'])
-
-history = model.fit(train_data,
-                    train_labels,
-                    shuffle=False,
-                    epochs=20,
-                    batch_size=32,
-                    validation_split=.2,
-                    callbacks=keras.callbacks.CSVLogger(output_paths['training_log'])
-                    )
-
-pred_loss, pred_error = model.evaluate(test_data, test_labels)
-write_report(output_paths, model, pred_error, history, 'mae')
