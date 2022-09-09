@@ -11,6 +11,7 @@ import numpy as np
 import pprint
 import matplotlib.pyplot as plt
 import seaborn as sn
+import mpld3
 
 import ml.shared as shared
 
@@ -115,6 +116,7 @@ def write_report(output_paths, model, pred_error_per_obs, history, ols_error, cf
     training_log_path = output_paths['training_log']
     shared.write_model_graph(model, model_graph_path)
     corr_heatmap_path = output_paths['corr_heatmap']
+    histogram_path = output_paths['histogram']
 
     if os.path.exists(report_path):
         os.remove(report_path)
@@ -125,6 +127,7 @@ def write_report(output_paths, model, pred_error_per_obs, history, ols_error, cf
     html_pred_error = build_prediction_error_html(pred_error_per_obs, ols_error)
     html_cfg = convert_dict_to_html(cfg)
     html_corr_heatmap = shared.read_image_as_html(corr_heatmap_path, 'Correlation Matrix')
+    html_histogram = shared.read_image_as_html(histogram_path)
 
     with open(report_path, 'a') as report:
         report.write(html_cfg)
@@ -132,6 +135,7 @@ def write_report(output_paths, model, pred_error_per_obs, history, ols_error, cf
         report.write(html_accuracy)
         report.write(html_loss)
         # report.write(html_training_log)
+        report.write(html_histogram)
         report.write(html_corr_heatmap)
         report.write(html_model_graph)
         report.close()
@@ -161,10 +165,22 @@ def write_correlation_matrix_heatmap(train_data, train_labels, out_path):
     sn.heatmap(corr_mat, annot=True)
     plt.savefig(out_path)
 
+def write_histogram_for_raw_data_numeric_cols(df, output_path):
+    num_cols = ['status', 'finaldest', 'footings', 'lease', 'region', 'piers',
+                'secured', 'titled', 'sections', 'price', 'sqft', 'bedrooms',
+                'location']
+    df = df.copy()
+    for col in num_cols:
+        df[col] = df[col].astype(float)
+    hist = df[num_cols].hist(figsize=(10,10))
+    plt.savefig(output_path)
+
+
 usr_path = os.path.expanduser('~/')
 output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
                 'model_graph': f'{usr_path}/Desktop/housing/model_graph.png',
                 'corr_heatmap': f'{usr_path}/Desktop/housing/corr_heatmap.png',
+                'histogram': f'{usr_path}/Desktop/housing/histogram.png',
                 'report': f'{usr_path}/Desktop/housing/housing_report.html'
                 }
 
@@ -189,6 +205,7 @@ download_data()
 df = pd.read_excel('/home/amundy/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
 df['constant'] = 1
 df.columns = df.columns.str.lower()
+write_histogram_for_raw_data_numeric_cols(df, output_paths['histogram'])
 df = alter_dtypes(df)
 categorical_cols = \
     [
