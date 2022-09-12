@@ -127,7 +127,7 @@ def write_report(output_paths, model, pred_error_per_obs, history, ols_error, cf
     html_pred_error = build_prediction_error_html(pred_error_per_obs, ols_error)
     html_cfg = convert_dict_to_html(cfg)
     html_corr_heatmap = shared.read_image_as_html(corr_heatmap_path, 'Correlation Matrix')
-    html_histogram = shared.read_image_as_html(histogram_path)
+    html_histogram = shared.read_image_as_html(histogram_path, 'Features Histogram')
 
     with open(report_path, 'a') as report:
         report.write(html_cfg)
@@ -154,7 +154,8 @@ def get_ols_error(train_labels, train_data, test_data):
     res = model.fit()
     res.summary()
     ols_pred = res.predict(test_data)
-    ols_error = (ols_pred - test_labels).sum() / len(ols_pred)
+    # construct mean absolute error
+    ols_error = (ols_pred - test_labels).abs().sum() / len(ols_pred)
 
     return ols_error
 
@@ -190,7 +191,7 @@ output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
 
 cfg = {'layers': [['relu', 64],
                   ['relu', 64],
-                  [None, 1]],
+                  ['linear', 1]],
        'epochs': 50,
        'batch_size': 32,
        'loss': 'mae',
@@ -214,8 +215,14 @@ categorical_cols = \
         # 'secured',
         # 'bedrooms'
         ]
+non_categorical_cols = \
+    [
+        'constant',
+        'sqft'
+        ]
+
 df = one_hot_categoricals(df, categorical_cols)
-features = ['constant', 'sqft']
+features = non_categorical_cols
 for col in categorical_cols:
     features += [x for x in df if col + '_' in x]
 cfg['features'] = features
