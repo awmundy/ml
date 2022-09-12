@@ -12,6 +12,7 @@ import pprint
 import matplotlib.pyplot as plt
 import seaborn as sn
 import mpld3
+from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
 
 import ml.shared as shared
 
@@ -149,11 +150,19 @@ def normalize(df, cols):
 
     return df
 
-def get_ols_error(train_labels, train_data, test_data):
-    model = sm.OLS(train_labels, train_data)
+def get_ols_error(train_data, train_labels, test_data):
+    for idx, col in enumerate(train_data.columns):
+        vif = get_vif(train_data, idx)
+        # todo is a high vif for the constant acceptable
+        if (vif > 10) & (col != 'constant'):
+            print(f' VIF for {col} is {vif} which is ')
+
+
+    model = sm.OLS(train_labels, train_data, missing='raise', hasconst=True)
     res = model.fit()
-    res.summary()
+    # print(res.summary2())
     ols_pred = res.predict(test_data)
+
     # construct mean absolute error
     ols_error = (ols_pred - test_labels).abs().sum() / len(ols_pred)
 
