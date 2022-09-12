@@ -89,6 +89,24 @@ def build_training_log_html(training_log_path):
 
     return html
 
+def build_test_labels_describe_html(test_labels_describe):
+    html =  f"""
+    <html>
+      <head>
+      </head>
+      <body>
+        <h2>Test Labels Describe</h2>
+        <table style="width:100">
+            <tr>
+              <td>{test_labels_describe.reset_index().to_html(index=False)}</td>
+            </tr>
+          </table>
+      </body>
+    </html>
+    """
+
+    return html
+
 def write_model_graph(model, out_path):
     keras.utils.plot_model(model,
                            to_file=out_path,

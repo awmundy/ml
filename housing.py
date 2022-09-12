@@ -106,18 +106,25 @@ def convert_dict_to_html(cfg):
 
     return html
 
-def write_report(output_paths, model, pred_error_per_obs, history, ols_error, cfg):
+def write_report(model, history, ols_error, test_labels, test_data, cfg):
 
     metric = cfg['metrics']
     assert len(metric) == 1
     metric = metric[0]
 
-    report_path = output_paths['report']
-    model_graph_path = output_paths['model_graph']
-    training_log_path = output_paths['training_log']
+    report_path = cfg['out_paths']['report']
+    model_graph_path = cfg['out_paths']['model_graph']
+    training_log_path = cfg['out_paths']['training_log']
+    corr_heatmap_path = cfg['out_paths']['corr_heatmap']
+    histogram_path = cfg['out_paths']['histogram']
+
     shared.write_model_graph(model, model_graph_path)
-    corr_heatmap_path = output_paths['corr_heatmap']
-    histogram_path = output_paths['histogram']
+
+    # get per observation prediction error
+    _, pred_error = model.evaluate(test_data, test_labels)
+    pred_error /= len(test_data)
+
+    test_labels_describe = test_labels.describe()
 
     if os.path.exists(report_path):
         os.remove(report_path)
@@ -125,14 +132,16 @@ def write_report(output_paths, model, pred_error_per_obs, history, ols_error, cf
     html_accuracy = shared.build_training_plot_html(history, metric)
     html_loss = shared.build_training_plot_html(history, 'loss')
     html_training_log = shared.build_training_log_html(training_log_path)
-    html_pred_error = build_prediction_error_html(pred_error_per_obs, ols_error)
+    html_pred_error = build_prediction_error_html(pred_error, ols_error)
     html_cfg = convert_dict_to_html(cfg)
     html_corr_heatmap = shared.read_image_as_html(corr_heatmap_path, 'Correlation Matrix')
     html_histogram = shared.read_image_as_html(histogram_path, 'Features Histogram')
+    html_test_labels_describe = shared.build_test_labels_describe_html(test_labels_describe)
 
     with open(report_path, 'a') as report:
         report.write(html_cfg)
         report.write(html_pred_error)
+        report.write(html_test_labels_describe)
         report.write(html_accuracy)
         report.write(html_loss)
         # report.write(html_training_log)
@@ -171,7 +180,9 @@ def get_ols_error(train_data, train_labels, test_data):
 def write_correlation_matrix_heatmap(train_data, train_labels, out_path):
     corr_mat = pd.concat([train_data, train_labels], axis=1).corr()
     corr_mat = corr_mat.round(2)
-    fig = plt.figure(figsize = (15, 15))
+    corr_mat.drop(columns='constant', inplace=True)
+    fig_dim = float((3 + len(train_data.columns)))
+    fig = plt.figure(figsize = (fig_dim, fig_dim))
     sn.heatmap(corr_mat, annot=True)
     plt.savefig(out_path)
 
@@ -185,27 +196,36 @@ def write_histogram_for_raw_data_numeric_cols(df, output_path):
     hist = df[num_cols].hist(figsize=(10,10))
     plt.savefig(output_path)
 
+def get_feature_list(df, non_categorical_cols, categorical_cols):
+    features = non_categorical_cols
+    for col in categorical_cols:
+        features += [x for x in df if col + '_' in x]
 
-usr_path = os.path.expanduser('~/')
-output_paths = {'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
-                'model_graph': f'{usr_path}/Desktop/housing/model_graph.png',
-                'corr_heatmap': f'{usr_path}/Desktop/housing/corr_heatmap.png',
-                'histogram': f'{usr_path}/Desktop/housing/histogram.png',
-                'report': f'{usr_path}/Desktop/housing/housing_report.html'
-                }
+    return features
+
+
+
+
 
 # todo if i want to use the vacancy/occupancy data, would have to format it first
 # todo why does normalization cause convergence to take longer?
 
 
-cfg = {'layers': [['relu', 64],
+usr_path = os.path.expanduser('~/')
+cfg = {'out_paths':{'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
+                    'model_graph': f'{usr_path}/Desktop/housing/model_graph.png',
+                    'corr_heatmap': f'{usr_path}/Desktop/housing/corr_heatmap.png',
+                    'histogram': f'{usr_path}/Desktop/housing/histogram.png',
+                    'report': f'{usr_path}/Desktop/housing/housing_report.html'
+                    },
+       'layers': [['relu', 64],
                   ['relu', 64],
                   ['linear', 1]],
        'epochs': 50,
        'batch_size': 32,
        'loss': 'mae',
        'metrics': ['mae'],
-       'normalized_features': ['sqft']
+       'normalized_features': ['sqft'],
        }
 
 shared.use_cpu_and_make_results_reproducible()
@@ -213,12 +233,12 @@ download_data()
 df = pd.read_excel('/home/amundy/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
 df['constant'] = 1
 df.columns = df.columns.str.lower()
-write_histogram_for_raw_data_numeric_cols(df, output_paths['histogram'])
+write_histogram_for_raw_data_numeric_cols(df, cfg['out_paths']['histogram'])
 df = alter_dtypes(df)
 categorical_cols = \
     [
-        # 'region',
-        'sections',
+        'region',
+        # 'sections',
         # 'finaldest',
         # 'footings',
         # 'secured',
@@ -231,9 +251,7 @@ non_categorical_cols = \
         ]
 
 df = one_hot_categoricals(df, categorical_cols)
-features = non_categorical_cols
-for col in categorical_cols:
-    features += [x for x in df if col + '_' in x]
+features = get_feature_list(df, non_categorical_cols, categorical_cols)
 cfg['features'] = features
 
 train_data, train_labels, test_data, test_labels = \
@@ -242,8 +260,8 @@ train_data, train_labels, test_data, test_labels = \
 
 train_data = train_data[features].copy()
 test_data = test_data[features].copy()
-write_correlation_matrix_heatmap(train_data, train_labels, output_paths['corr_heatmap'])
-ols_error = get_ols_error(train_labels, train_data, test_data)
+ols_error = get_ols_error(train_data, train_labels, test_data)
+write_correlation_matrix_heatmap(train_data, train_labels, cfg['out_paths']['corr_heatmap'])
 
 if 'normalized_features' in cfg.keys():
     train_data = normalize(train_data, cfg['normalized_features'])
@@ -262,12 +280,14 @@ history = model.fit(train_data,
                     epochs=cfg['epochs'],
                     batch_size=cfg['batch_size'],
                     validation_split=.2,
-                    callbacks=keras.callbacks.CSVLogger(output_paths['training_log'])
+                    callbacks=keras.callbacks.CSVLogger(cfg['out_paths']['training_log']),
+                    verbose=0
                     )
 
-pred_loss, pred_error = model.evaluate(test_data, test_labels)
-pred_error_per_obs = pred_error / len(test_data)
-write_report(output_paths, model, pred_error_per_obs, history, ols_error, cfg)
+pred = model.predict(test_data).flatten()
+(pred - test_labels).abs().sum() / len(test_data)
+
+write_report(model, history, ols_error, test_labels, test_data, cfg)
 
 ### NOTES ###
 # explanatory variables
