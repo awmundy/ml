@@ -203,6 +203,11 @@ def get_feature_list(df, non_categorical_cols, categorical_cols):
 
     return features
 
+def drop_records_with_no_price(df):
+    msk = np.isclose(df['price'], 9)
+    df = df[~msk].copy()
+
+    return df
 
 
 
@@ -233,8 +238,9 @@ download_data()
 df = pd.read_excel('/home/amundy/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
 df['constant'] = 1
 df.columns = df.columns.str.lower()
-write_histogram_for_raw_data_numeric_cols(df, cfg['out_paths']['histogram'])
 df = alter_dtypes(df)
+df = drop_records_with_no_price(df)
+write_histogram_for_raw_data_numeric_cols(df, cfg['out_paths']['histogram'])
 categorical_cols = \
     [
         'region',
