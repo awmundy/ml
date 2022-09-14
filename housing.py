@@ -238,7 +238,7 @@ cfg = {'out_paths':{'training_log': f'{usr_path}/Desktop/housing/training_log.cs
 
 shared.use_cpu_and_make_results_reproducible()
 download_data()
-df = pd.read_excel('/home/amundy/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
+df = pd.read_excel(f'{usr_path}/Documents/census_data/housing/2021_mfr_house_puf.xls', dtype=str)
 df['constant'] = 1
 df.columns = df.columns.str.lower()
 df = alter_dtypes(df)
