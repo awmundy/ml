@@ -121,8 +121,10 @@ def write_report(model, history, ols_error, test_labels, test_data, cfg):
     shared.write_model_graph(model, model_graph_path)
 
     # get per observation prediction error
-    _, pred_error = model.evaluate(test_data, test_labels)
-    pred_error /= len(test_data)
+    # _, p = model.evaluate(test_data, test_labels)
+    pred = model.predict(test_data)
+    pred_error = (pred.flatten() - test_labels).abs().sum() / len(test_labels)
+    pred_error = round(pred_error)
 
     test_labels_describe = test_labels.describe()
 
@@ -174,6 +176,7 @@ def get_ols_error(train_data, train_labels, test_data):
 
     # construct mean absolute error
     ols_error = (ols_pred - test_labels).abs().sum() / len(ols_pred)
+    ols_error = round(ols_error)
 
     return ols_error
 
@@ -244,11 +247,11 @@ write_histogram_for_raw_data_numeric_cols(df, cfg['out_paths']['histogram'])
 categorical_cols = \
     [
         'region',
-        # 'sections',
-        # 'finaldest',
-        # 'footings',
-        # 'secured',
-        # 'bedrooms'
+        'sections',
+        'finaldest',
+        'footings',
+        'secured',
+        'bedrooms'
         ]
 non_categorical_cols = \
     [
@@ -288,11 +291,8 @@ history = model.fit(train_data,
                     batch_size=cfg['batch_size'],
                     validation_split=.2,
                     callbacks=keras.callbacks.CSVLogger(cfg['out_paths']['training_log']),
-                    verbose=0
+                    # verbose=0
                     )
-
-pred = model.predict(test_data).flatten()
-(pred - test_labels).abs().sum() / len(test_data)
 
 write_report(model, history, ols_error, test_labels, test_data, cfg)
 
