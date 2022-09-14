@@ -271,6 +271,7 @@ write_correlation_matrix_heatmap(train_data, train_labels, cfg['out_paths']['cor
 
 if 'normalized_features' in cfg.keys():
     train_data = normalize(train_data, cfg['normalized_features'])
+    test_data = normalize(test_data, cfg['normalized_features'])
 
 model = keras.Sequential()
 for activation, size in cfg['layers']:
