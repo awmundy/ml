@@ -178,9 +178,9 @@ def get_ols_error(train_data, train_labels, test_data):
     return ols_error
 
 def write_correlation_matrix_heatmap(train_data, train_labels, out_path):
-    corr_mat = pd.concat([train_data, train_labels], axis=1).corr()
+    df = pd.concat([train_data, train_labels], axis=1).drop(columns='constant')
+    corr_mat = df.corr()
     corr_mat = corr_mat.round(2)
-    corr_mat.drop(columns='constant', inplace=True)
     fig_dim = float((3 + len(train_data.columns)))
     fig = plt.figure(figsize = (fig_dim, fig_dim))
     sn.heatmap(corr_mat, annot=True)
