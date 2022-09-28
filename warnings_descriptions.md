@@ -1,5 +1,5 @@
 # Purpose
-### To document the various warnings that tensorflow shows. These warnings are frequent and are therefore turned off in these scripts. Ideally ever warning is investigated and its impacts (including no impacts) are documented here. 
+### To document the various warnings that tensorflow shows. These warnings are frequent and are therefore turned off in these scripts. Ideally every warning is investigated and its impacts (including no impacts) are documented here. 
 #### Note: many of these warnings are actually at the `INFO` logging level but are all referred to as warnings here for simplicity
 
 ## Numa node
@@ -12,12 +12,12 @@
 
 ## CPU instructions optimization
 ### `I tensorflow/core/platform/cpu_feature_guard.cc:151] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  SSE4.1 SSE4.2 AVX AVX2 FMA To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.`
-- Tensorflow is saying that it takes notices characteristics of the CPU and is optimizing accordingly
+- Tensorflow is saying that it notices characteristics of the CPU and is optimizing accordingly
 ### Impact: None
 
 ### GPU device "creation"
 ### `I tensorflow/core/common_runtime/gpu/gpu_device.cc:1525] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 6646 MB memory:  -> device: 0, name: NVIDIA GeForce RTX 2070, pci bus id: 0000:01:00.0, compute capability: 7.5`
-- Gives info about the BPU being used
+- Gives info about the GPU being used
 ### Impact: None
 
 ### CUDA_ERROR_NO_DEVICE
