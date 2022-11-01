@@ -78,6 +78,13 @@ def turn_off_scientific_notation():
     # matplotlib axes
     plt.rcParams["axes.formatter.limits"] = (-5, 12)
 
+def remove_0_passenger_count_trips(df):
+    msk = np.isclose(df['passenger_count'], 0)
+    print(f'removing {msk.sum()} trips where the passenger count was 0')
+    df = df[~msk].copy()
+
+    return df
+
 def write_report():
     pass
     # import plotly.express as px
@@ -96,16 +103,17 @@ shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
 
 
-
 dtypes, dt_cols = get_dtypes('test')
 test = pd.read_csv(test_path, dtype=dtypes, parse_dates=dt_cols)
 # convert Y/N col to float
 test = convert_store_and_fwd_flag_to_float(test)
+test = remove_0_passenger_count_trips(test)
 assert test.notnull().all().all()
 dtypes, dt_cols = get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = convert_store_and_fwd_flag_to_float(train)
 train = remove_outlier_long_trips(train)
+train = remove_0_passenger_count_trips(train)
 
 
 write_histogram(test, test_histogram_path)
