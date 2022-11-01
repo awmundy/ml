@@ -71,15 +71,6 @@ def remove_0_passenger_count_trips(df):
 
     return df
 
-def write_report():
-    pass
-    # import plotly.express as px
-    # fig = px.histogram(train, x='trip_duration')
-    #
-    # hist_html = fig.to_html()
-    # with open(f'{usr_dir}/Documents/ml_taxi/test.html', 'w') as report:
-    #     report.write(hist_html)
-
 def remove_outlier_lat_long_trips(df):
     min_lat = 40.5
     max_lat = 41.0
