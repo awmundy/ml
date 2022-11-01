@@ -122,6 +122,19 @@ def write_pickup_dropoff_scatterplot_map(train, train_map_path):
     # write out
     plt.savefig(train_map_path)
 
+def write_correlation_matrix_heatmap(train, out_path):
+    corr_mat = train[sorted(train.columns)].corr()
+    corr_mat = corr_mat.round(2)
+    fig_dim = float((5 + len(train.columns)))
+    fig = plt.figure(figsize = (fig_dim, fig_dim))
+    hm = sn.heatmap(corr_mat, annot=True, annot_kws={'size': 15}, cmap='Blues')
+    hm.set_xticklabels(hm.get_xmajorticklabels(), fontsize=16, rotation=30)
+    hm.set_yticklabels(hm.get_ymajorticklabels(), fontsize=16, rotation=30)
+    # make sure laels are on top and bottom
+    plt.tick_params(axis='both', which='major',
+                    labelbottom = True, bottom=True, top = False, labeltop=True)
+    plt.savefig(out_path)
+
 # todo one hot categorical variables
 # todo ols benchmark
 # todo normalization
@@ -134,6 +147,7 @@ nyc_boundary_path = f'{usr_dir}/Documents/ml_taxi/nyc_borough_geo_files/geo_expo
 train_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_train.png'
 test_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_test.png'
 train_map_path = f'{usr_dir}/Documents/ml_taxi/map_train.png'
+correlation_heatmap_path = f'{usr_dir}/Documents/ml_taxi/correlation_heatmap_train.png'
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
 
@@ -155,4 +169,6 @@ assert train.notnull().all().all()
 write_histogram(test, test_histogram_path)
 write_histogram(train, train_histogram_path)
 write_pickup_dropoff_scatterplot_map(train, train_map_path)
+write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 print('done')
+
