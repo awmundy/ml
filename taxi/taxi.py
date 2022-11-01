@@ -16,23 +16,11 @@ import ml.shared as shared
 
 
 def write_histogram(df, output_path):
-    ignore_cols = ['id',
-                  'vendor_id',
-                  'pickup_longitude',
-                  'pickup_latitude',
-                  'dropoff_longitude',
-                  'dropoff_latitude',
-                  ]
+    ignore_cols = ['id']
     histogram_cols = [x for x in df if x not in ignore_cols]
-    n_plots = len(histogram_cols)
-    figsize_y = n_plots * 3
-    figsize_x = 6
 
-    fig, ax = plt.subplots(nrows=len(histogram_cols), ncols=1, figsize=(figsize_x, figsize_y))
-    df.hist(ax=ax, column=histogram_cols)
-    fig.savefig(output_path)
-
-
+    hist = df[histogram_cols].hist(figsize=(10,10))
+    plt.savefig(output_path)
 
 def get_dtypes(dataset):
     assert dataset in ['train', 'test']
@@ -55,11 +43,9 @@ def get_dtypes(dataset):
 
     return dtypes, dt_cols
 
-
-
-def convert_store_and_fwd_flag_to_float(df):
+def convert_categoricals_to_float(df):
     df['store_and_fwd_flag'] = df['store_and_fwd_flag'].replace({'Y':1.0, 'N': 0.0})
-
+    df['vendor_id'] = df['vendor_id'].astype(float)
     return df
 
 def remove_outlier_long_trips(df):
@@ -158,14 +144,14 @@ turn_off_scientific_notation()
 
 dtypes, dt_cols = get_dtypes('test')
 test = pd.read_csv(test_path, dtype=dtypes, parse_dates=dt_cols)
-test = convert_store_and_fwd_flag_to_float(test)
+test = convert_categoricals_to_float(test)
 test = remove_0_passenger_count_trips(test)
 test = remove_outlier_lat_long_trips(test)
 assert test.notnull().all().all()
 
 dtypes, dt_cols = get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
-train = convert_store_and_fwd_flag_to_float(train)
+train = convert_categoricals_to_float(train)
 train = remove_outlier_long_trips(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_lat_long_trips(train)
@@ -174,3 +160,4 @@ assert train.notnull().all().all()
 write_histogram(test, test_histogram_path)
 write_histogram(train, train_histogram_path)
 write_pickup_dropoff_scatterplot_map(train, train_map_path)
+print('done')
