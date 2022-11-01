@@ -94,6 +94,25 @@ def write_report():
     # with open(f'{usr_dir}/Documents/ml_taxi/test.html', 'w') as report:
     #     report.write(hist_html)
 
+def remove_outlier_lat_long_trips(df):
+    min_lat = 40.5
+    max_lat = 41.0
+    min_long = -74.05
+    max_long = -73.6
+
+    msk = df['pickup_latitude'].between(min_lat, max_lat)
+    msk &= df['pickup_longitude'].between(min_long, max_long)
+    if 'dropoff_latitude' in df.columns:
+        msk &= df['dropoff_latitude'].between(min_lat, max_lat)
+        msk &= df['dropoff_longitude'].between(min_long, max_long)
+    print(f'removing {(~msk).sum()} trips where the lat/longs were out of range')
+
+    df = df[msk].copy()
+
+    return df
+
+
+
 usr_dir = os.path.expanduser('~')
 train_path = f'{usr_dir}/Documents/ml_taxi/train.csv'
 test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
@@ -108,13 +127,14 @@ test = pd.read_csv(test_path, dtype=dtypes, parse_dates=dt_cols)
 # convert Y/N col to float
 test = convert_store_and_fwd_flag_to_float(test)
 test = remove_0_passenger_count_trips(test)
+test = remove_outlier_lat_long_trips(test)
 assert test.notnull().all().all()
 dtypes, dt_cols = get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = convert_store_and_fwd_flag_to_float(train)
 train = remove_outlier_long_trips(train)
 train = remove_0_passenger_count_trips(train)
-
+train = remove_outlier_lat_long_trips(train)
 
 write_histogram(test, test_histogram_path)
 write_histogram(train, train_histogram_path)
