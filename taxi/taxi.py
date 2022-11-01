@@ -16,6 +16,23 @@ import ml.shared as shared
 np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
 pd.set_option('display.float_format', lambda x: '%.6f' % x)
 
+def write_histogram(df, output_path):
+    ignore_cols = ['id',
+                  'vendor_id',
+                  'pickup_longitude',
+                  'pickup_latitude',
+                  'dropoff_longitude',
+                  'dropoff_latitude',
+                  ]
+    histogram_cols = [x for x in df if x not in ignore_cols]
+    n_plots = len(histogram_cols)
+    figsize_y = n_plots * 3
+    figsize_x = 6
+
+    fig, ax = plt.subplots(nrows=len(histogram_cols), ncols=1, figsize=(figsize_x, figsize_y))
+    df.hist(ax=ax, column=histogram_cols)
+    fig.savefig(output_path)
+
 def get_dtypes(dataset):
     assert dataset in ['train', 'test']
 
