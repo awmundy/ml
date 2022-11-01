@@ -12,9 +12,7 @@ import seaborn as sn
 from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
 import ml.shared as shared
 
-# no scientific notation
-np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
-pd.set_option('display.float_format', lambda x: '%.6f' % x)
+
 
 def write_histogram(df, output_path):
     ignore_cols = ['id',
@@ -69,6 +67,14 @@ def remove_outlier_long_trips(df):
 
     return df
 
+def turn_off_scientific_notation():
+    #numpy
+    np.set_printoptions(suppress=True, formatter={'float_kind':'{:f}'.format})
+    # pandas
+    pd.set_option('display.float_format', lambda x: '%.6f' % x)
+    # matplotlib axes
+    plt.rcParams["axes.formatter.limits"] = (-5, 12)
+
 def write_report():
     pass
     # import plotly.express as px
@@ -84,6 +90,7 @@ test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
 train_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_train.png'
 test_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_test.png'
 shared.use_cpu_and_make_results_reproducible()
+turn_off_scientific_notation()
 
 
 
