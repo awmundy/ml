@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
 import geopandas as gpd
+from matplotlib.lines import Line2D
+
 import ml.shared as shared
 
 
@@ -29,6 +31,8 @@ def write_histogram(df, output_path):
     fig, ax = plt.subplots(nrows=len(histogram_cols), ncols=1, figsize=(figsize_x, figsize_y))
     df.hist(ax=ax, column=histogram_cols)
     fig.savefig(output_path)
+
+
 
 def get_dtypes(dataset):
     assert dataset in ['train', 'test']
@@ -107,4 +111,33 @@ train = remove_outlier_long_trips(train)
 write_histogram(test, test_histogram_path)
 write_histogram(train, train_histogram_path)
 
+# plt.scatter(x=test['pickup_longitude'], y=test['pickup_latitude'])
+# plt.show()
 
+df = train.head(100000).copy()
+nyc_geo = gpd.read_file('/home/amundy/Documents/ml_taxi/nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp')
+pickup_gdf = gpd.GeoDataFrame(df.copy(), geometry=gpd.points_from_xy(df['pickup_longitude'],
+                                                          df['pickup_latitude']))
+dropoff_gdf = gpd.GeoDataFrame(df.copy(), geometry=gpd.points_from_xy(df['dropoff_longitude'],
+                                                          df['dropoff_latitude']))
+# print(pickup_gdf.head())
+# print(dropoff_gdf.head())
+
+# fig, ax = plt.subplots()
+# nyc_geo.plot(ax=ax)
+ax = nyc_geo.plot(facecolor='azure', edgecolor='black')
+pickup_gdf.plot(ax=ax, color='darkblue', marker='^', label='pickup', alpha=.1)
+dropoff_gdf.plot(ax=ax, color='crimson', marker='v', label='dropoff', alpha=.1)
+minx = min(pickup_gdf['pickup_longitude'].min(), dropoff_gdf['dropoff_longitude'].min()) - .01
+maxx = min(pickup_gdf['pickup_longitude'].max(), dropoff_gdf['dropoff_longitude'].max()) +.01
+miny = min(pickup_gdf['pickup_latitude'].min(), dropoff_gdf['dropoff_latitude'].min()) - .01
+maxy = min(pickup_gdf['pickup_latitude'].max(), dropoff_gdf['dropoff_latitude'].max()) + .01
+ax.set_xlim(minx, maxx)
+ax.set_ylim(miny, maxy)
+lines = [
+    Line2D([0], [0], linestyle="none", marker="s", markersize=10, markerfacecolor=a.get_facecolor())
+    for a in ax.collections[1:]
+]
+labels = [t.get_label() for t in ax.collections[1:]]
+ax.legend(lines, labels)
+plt.show()
