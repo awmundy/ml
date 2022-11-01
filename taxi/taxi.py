@@ -131,6 +131,10 @@ def write_pickup_dropoff_scatterplot_map(train, train_map_path):
     # write out
     plt.savefig(train_map_path)
 
+# todo one hot categorical variables
+# todo ols benchmark
+# todo normalization
+
 usr_dir = os.path.expanduser('~')
 train_path = f'{usr_dir}/Documents/ml_taxi/train.csv'
 test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
