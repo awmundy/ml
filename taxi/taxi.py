@@ -211,6 +211,8 @@ train_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_train.png'
 test_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_test.png'
 train_map_path = f'{usr_dir}/Documents/ml_taxi/map_train.png'
 correlation_heatmap_path = f'{usr_dir}/Documents/ml_taxi/correlation_heatmap_train.png'
+model_graph_path = f'{usr_dir}/Documents/ml_taxi/model_graph.png'
+model_accuracy_report_path = f'{usr_dir}/Documents/ml_taxi/model_accuracy_report.html'
 
 y_var = 'trip_duration'
 x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude',
@@ -243,10 +245,11 @@ ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 cfg = {'layers': [['relu', 64],
                   ['relu', 64],
                   ['linear', 1]],
-       'epochs': 5,
-       'batch_size': 1000,
+       'epochs': 30,
+       'batch_size': 10000,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
+
        }
 model = keras.Sequential()
 for activation, size in cfg['layers']:
@@ -265,3 +268,17 @@ history = model.fit(train_x,
                     # callbacks=keras.callbacks.CSVLogger('path_to_log_file.txt',
                     # verbose=0
                     )
+
+shared.write_model_graph(model, model_graph_path)
+html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
+html_loss = shared.build_training_plot_html(history, 'loss')
+html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
+if os.path.exists(model_accuracy_report_path):
+    os.remove(model_accuracy_report_path)
+
+with open(model_accuracy_report_path, 'a') as report:
+    report.write(html_accuracy)
+    report.write(html_loss)
+    report.write(html_model_graph)
+    report.close()
+    print('done writing report')
