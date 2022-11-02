@@ -145,21 +145,20 @@ def get_ols_error(train, test, y_var, x_vars):
 
     train_y = train[y_var].copy()
     train_x = train[x_vars].copy()
+    test_x = test[x_vars].copy()
     test_y = test[y_var].copy()
 
     for idx, col in enumerate(train_x.columns):
-        print(col)
         vif = get_vif(train_x, idx)
-        print(vif)
         # todo is a high vif for the constant acceptable
         if (vif > 10) & (col != 'constant'):
-            print(f' VIF for {col} is {vif} which is ')
+            print(f'VIF for {col} is {vif} which is too high')
 
 
     model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
     res = model.fit()
     print(res.summary2())
-    ols_pred = res.predict(test)
+    ols_pred = res.predict(test_x)
 
     # construct mean absolute error
     ols_error = (ols_pred - test_y).abs().sum() / len(ols_pred)
@@ -223,6 +222,8 @@ train = drop_id_column(train)
 assert train.notnull().all().all()
 
 train, validation, test = get_train_test_val_split(train, .1, .1)
+
+ols_error = get_ols_error(train, test, y_var, x_vars)
 
 # write_histogram(test, test_histogram_path)
 # write_histogram(train, train_histogram_path)
