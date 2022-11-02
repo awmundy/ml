@@ -91,7 +91,7 @@ def remove_outlier_lat_long_trips(df):
 
 def write_pickup_dropoff_scatterplot_map(train, train_map_path):
     # subset bc the viz gets unreadable due to dropoff points overlapping pickup
-    df = train.sample(10000, random_state=1).copy()
+    df = train.sample(1000, random_state=1).copy()
 
     # read in shape file that contains map boundaries
     nyc_geo = gpd.read_file(nyc_boundary_path)
