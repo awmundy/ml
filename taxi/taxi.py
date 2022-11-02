@@ -167,6 +167,28 @@ def get_ols_error(train, test, y_var, x_vars):
 
     return ols_error
 
+def prep_kaggle_test_data(kaggle_test_path):
+    dtypes, dt_cols = get_dtypes('kaggle_test')
+    kaggle_test = pd.read_csv(kaggle_test_path, dtype=dtypes, parse_dates=dt_cols)
+    kaggle_test = convert_categoricals_to_float(kaggle_test)
+    assert kaggle_test.notnull().all().all()
+
+    return kaggle_test
+
+def get_train_test_val_split(train, val_frac, test_frac):
+    assert (val_frac + test_frac) < 1
+    start_n = len(train)
+    train_frac = 1 - val_frac - test_frac
+    random_state = 1
+
+    train_new = train.sample(frac=train_frac, random_state=random_state)
+    train = train.drop(train_new.index)
+    validation = train.sample(frac=val_frac/(val_frac + test_frac), random_state=random_state)
+    test = train.drop(validation.index)
+
+    assert (len(train_new) + len(validation) + len(test)) == start_n
+
+    return train_new, validation, test
 
 # todo one hot categorical variables
 # todo ols benchmark
@@ -189,14 +211,8 @@ x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_lon
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
 
+# kaggle_test = prep_kaggle_test_data(kaggle_test_path)
 
-dtypes, dt_cols = get_dtypes('test')
-test = pd.read_csv(test_path, dtype=dtypes, parse_dates=dt_cols)
-test = convert_categoricals_to_float(test)
-test = remove_0_passenger_count_trips(test)
-test = remove_outlier_lat_long_trips(test)
-test = drop_id_column(test)
-assert test.notnull().all().all()
 
 dtypes, dt_cols = get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
@@ -206,9 +222,11 @@ train = remove_outlier_long_trips(train)
 train = drop_id_column(train)
 assert train.notnull().all().all()
 
-write_histogram(test, test_histogram_path)
-write_histogram(train, train_histogram_path)
-write_pickup_dropoff_scatterplot_map(train, train_map_path)
-write_correlation_matrix_heatmap(train, correlation_heatmap_path)
-print('done')
+train, validation, test = get_train_test_val_split(train, .1, .1)
 
+# write_histogram(test, test_histogram_path)
+# write_histogram(train, train_histogram_path)
+# write_pickup_dropoff_scatterplot_map(train, train_map_path)
+# write_correlation_matrix_heatmap(train, correlation_heatmap_path)
+# print('done')
+#
