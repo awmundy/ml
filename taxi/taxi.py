@@ -79,6 +79,7 @@ def remove_outlier_lat_long_trips(df):
 
     msk = df['pickup_latitude'].between(min_lat, max_lat)
     msk &= df['pickup_longitude'].between(min_long, max_long)
+    # todo this isnt necessary as a for loop
     if 'dropoff_latitude' in df.columns:
         msk &= df['dropoff_latitude'].between(min_lat, max_lat)
         msk &= df['dropoff_longitude'].between(min_long, max_long)
