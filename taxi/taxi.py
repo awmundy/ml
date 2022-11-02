@@ -23,7 +23,7 @@ def write_histogram(df, output_path):
     plt.savefig(output_path)
 
 def get_dtypes(dataset):
-    assert dataset in ['train', 'test']
+    assert dataset in ['train', 'kaggle_test']
 
     dtypes = {'id': 'str',
               'vendor_id': 'str',
@@ -141,7 +141,7 @@ def write_correlation_matrix_heatmap(train, out_path):
 
 usr_dir = os.path.expanduser('~')
 train_path = f'{usr_dir}/Documents/ml_taxi/train.csv'
-test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
+kaggle_test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{usr_dir}/Documents/ml_taxi/nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
 train_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_train.png'
