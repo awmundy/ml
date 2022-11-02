@@ -199,7 +199,7 @@ def get_train_test_val_split(train_original, val_frac, test_frac, y_var):
     return train_x, train_y, validation_x, validation_y, test_x, test_y
 
 # todo one hot categorical variables
-# todo ols benchmark
+# todo make ols benchmark metric comparable to the ml model evaluation metric
 # todo normalization
 
 usr_dir = os.path.expanduser('~')
