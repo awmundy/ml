@@ -1,6 +1,7 @@
 import os
 from tensorflow.keras import layers
 from tensorflow import keras
+import tensorflow as tf
 import pandas as pd
 import statsmodels.api as sm
 import numpy as np
@@ -13,7 +14,8 @@ from matplotlib.lines import Line2D
 
 import ml.shared as shared
 
-
+# turn off tensorflow info messages about e.g. cpu optimization features
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 def write_histogram(df, output_path):
     ignore_cols = ['id']
@@ -238,5 +240,28 @@ train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_va
 ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 
 
-# print('done')
-#
+cfg = {'layers': [['relu', 64],
+                  ['relu', 64],
+                  ['linear', 1]],
+       'epochs': 5,
+       'batch_size': 1000,
+       'loss': 'mae',
+       'metrics': ['mean_squared_logarithmic_error'],
+       }
+model = keras.Sequential()
+for activation, size in cfg['layers']:
+    model.add(layers.Dense(size, activation=activation))
+
+model.compile(optimizer=keras.optimizers.RMSprop(),
+              loss=cfg['loss'],
+              metrics=cfg['metrics'])
+
+history = model.fit(train_x,
+                    train_y,
+                    shuffle=False,
+                    epochs=cfg['epochs'],
+                    batch_size=cfg['batch_size'],
+                    validation_data=(validation_x, validation_y)
+                    # callbacks=keras.callbacks.CSVLogger('path_to_log_file.txt',
+                    # verbose=0
+                    )
