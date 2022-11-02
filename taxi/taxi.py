@@ -135,6 +135,38 @@ def write_correlation_matrix_heatmap(train, out_path):
                     labelbottom = True, bottom=True, top = False, labeltop=True)
     plt.savefig(out_path)
 
+def drop_id_column(df):
+    df.drop(columns='id', inplace=True)
+
+    return df
+
+def get_ols_error(train, test, y_var, x_vars):
+
+    train_y = train[y_var].copy()
+    train_x = train[x_vars].copy()
+    test_y = test[y_var].copy()
+
+    for idx, col in enumerate(train_x.columns):
+        print(col)
+        vif = get_vif(train_x, idx)
+        print(vif)
+        # todo is a high vif for the constant acceptable
+        if (vif > 10) & (col != 'constant'):
+            print(f' VIF for {col} is {vif} which is ')
+
+
+    model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
+    res = model.fit()
+    print(res.summary2())
+    ols_pred = res.predict(test)
+
+    # construct mean absolute error
+    ols_error = (ols_pred - test_y).abs().sum() / len(ols_pred)
+    ols_error = round(ols_error)
+
+    return ols_error
+
+
 # todo one hot categorical variables
 # todo ols benchmark
 # todo normalization
@@ -148,6 +180,11 @@ train_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_train.png'
 test_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_test.png'
 train_map_path = f'{usr_dir}/Documents/ml_taxi/map_train.png'
 correlation_heatmap_path = f'{usr_dir}/Documents/ml_taxi/correlation_heatmap_train.png'
+
+y_var = 'trip_duration'
+x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude',
+          'dropoff_latitude', 'store_and_fwd_flag']
+
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
 
@@ -157,6 +194,7 @@ test = pd.read_csv(test_path, dtype=dtypes, parse_dates=dt_cols)
 test = convert_categoricals_to_float(test)
 test = remove_0_passenger_count_trips(test)
 test = remove_outlier_lat_long_trips(test)
+test = drop_id_column(test)
 assert test.notnull().all().all()
 
 dtypes, dt_cols = get_dtypes('train')
@@ -164,6 +202,7 @@ train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = convert_categoricals_to_float(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_trips(train)
+train = drop_id_column(train)
 assert train.notnull().all().all()
 
 write_histogram(test, test_histogram_path)
