@@ -141,12 +141,7 @@ def drop_id_column(df):
 
     return df
 
-def get_ols_error(train, test, y_var, x_vars):
-
-    train_y = train[y_var].copy()
-    train_x = train[x_vars].copy()
-    test_x = test[x_vars].copy()
-    test_y = test[y_var].copy()
+def get_ols_error(train_x, train_y, test_x, test_y):
 
     for idx, col in enumerate(train_x.columns):
         vif = get_vif(train_x, idx)
@@ -157,7 +152,7 @@ def get_ols_error(train, test, y_var, x_vars):
 
     model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
     res = model.fit()
-    print(res.summary2())
+    # print(res.summary2())
     ols_pred = res.predict(test_x)
 
     # construct mean absolute error
@@ -174,20 +169,32 @@ def prep_kaggle_test_data(kaggle_test_path):
 
     return kaggle_test
 
-def get_train_test_val_split(train, val_frac, test_frac):
+def get_train_test_val_split(train_original, val_frac, test_frac, y_var):
     assert (val_frac + test_frac) < 1
-    start_n = len(train)
+    start_n = len(train_original)
     train_frac = 1 - val_frac - test_frac
     random_state = 1
 
-    train_new = train.sample(frac=train_frac, random_state=random_state)
-    train = train.drop(train_new.index)
-    validation = train.sample(frac=val_frac/(val_frac + test_frac), random_state=random_state)
-    test = train.drop(validation.index)
+    train = train_original.sample(frac=train_frac, random_state=random_state)
+    train_original_subset = train_original.drop(train.index)
+    
+    validation = train_original_subset.sample(frac=val_frac/(val_frac + test_frac), random_state=random_state)
+    test = train_original_subset.drop(validation.index)
 
-    assert (len(train_new) + len(validation) + len(test)) == start_n
+    assert (len(train) + len(validation) + len(test)) == start_n
+    
+    train.reset_index(inplace=True, drop=True)
+    validation.reset_index(inplace=True, drop=True)
+    test.reset_index(inplace=True, drop=True)
+    
+    train_y = train[y_var].copy()
+    train_x = train.drop(columns=y_var)
+    validation_y = validation[y_var].copy()
+    validation_x = validation.drop(columns=y_var)
+    test_y = test[y_var].copy()
+    test_x = test.drop(columns=y_var)
 
-    return train_new, validation, test
+    return train_x, train_y, validation_x, validation_y, test_x, test_y
 
 # todo one hot categorical variables
 # todo ols benchmark
@@ -219,15 +226,17 @@ train = convert_categoricals_to_float(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_trips(train)
 train = drop_id_column(train)
+train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
-
-train, validation, test = get_train_test_val_split(train, .1, .1)
-
-ols_error = get_ols_error(train, test, y_var, x_vars)
-
 # write_histogram(test, test_histogram_path)
 # write_histogram(train, train_histogram_path)
 # write_pickup_dropoff_scatterplot_map(train, train_map_path)
 # write_correlation_matrix_heatmap(train, correlation_heatmap_path)
+
+train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
+
+ols_error = get_ols_error(train_x, train_y, test_x, test_y)
+
+
 # print('done')
 #
