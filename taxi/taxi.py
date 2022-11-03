@@ -199,8 +199,18 @@ def get_train_test_val_split(train_original, val_frac, test_frac, y_var):
     return train_x, train_y, validation_x, validation_y, test_x, test_y
 
 # todo one hot categorical variables
-# todo make ols benchmark metric comparable to the ml model evaluation metric
 # todo normalization
+# todo implement root mean squared logarithmic error as the error metric (for ols as well?)
+# todo add feature: rounded lat long dummies (should improve ols)
+# todo add feature: day of week or weekday/not weekday
+# todo add feature: hour of day or morning/afternoon/night
+# todo add feature: straight line distance between pickup and dropoff
+# todo add feature: boroughs (either pickup borough/dropoff borough as separate column or store in single col)
+# todo add feature: interactions (e.g. bourough-time of day)
+# todo add feature: airport dummies
+# todo query google api to get distance between ~few hundred rounded lat long points,
+#  built dataset of road distances between these points
+
 
 usr_dir = os.path.expanduser('~')
 train_path = f'{usr_dir}/Documents/ml_taxi/train.csv'
@@ -249,8 +259,10 @@ cfg = {'layers': [['relu', 64],
        'batch_size': 10000,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
-
+       # 'ols_features': [],
+       # 'ml_features': []
        }
+
 model = keras.Sequential()
 for activation, size in cfg['layers']:
     model.add(layers.Dense(size, activation=activation))
