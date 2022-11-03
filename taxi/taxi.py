@@ -13,6 +13,7 @@ import geopandas as gpd
 from matplotlib.lines import Line2D
 
 import ml.shared as shared
+import ml.taxi.taxi_shared as taxi_shared
 
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -23,27 +24,6 @@ def write_histogram(df, output_path):
 
     hist = df[histogram_cols].hist(figsize=(10,10))
     plt.savefig(output_path)
-
-def get_dtypes(dataset):
-    assert dataset in ['train', 'kaggle_test']
-
-    dtypes = {'id': 'str',
-              'vendor_id': 'str',
-              'passenger_count': 'float',
-              'pickup_longitude': 'float',
-              'pickup_latitude': 'float',
-              'dropoff_longitude': 'float',
-              'dropoff_latitude': 'float',
-              'store_and_fwd_flag': 'str',
-              }
-    # cols to convert to datetime on read
-    dt_cols = ['pickup_datetime']
-
-    if dataset == 'train':
-        dtypes['trip_duration'] = 'float'
-        dt_cols += ['dropoff_datetime']
-
-    return dtypes, dt_cols
 
 def convert_categoricals_to_float(df):
     df['store_and_fwd_flag'] = df['store_and_fwd_flag'].replace({'Y':1.0, 'N': 0.0})
@@ -234,7 +214,7 @@ turn_off_scientific_notation()
 # kaggle_test = prep_kaggle_test_data(kaggle_test_path)
 
 
-dtypes, dt_cols = get_dtypes('train')
+dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = convert_categoricals_to_float(train)
 train = remove_0_passenger_count_trips(train)
