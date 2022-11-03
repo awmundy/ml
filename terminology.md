@@ -47,5 +47,12 @@
 #### Links
 -https://stackoverflow.com/a/46308466/10199577
 
+# Loss
+### Value that is minimized during training, using gradient descent
+
+# Metrics
+### Measure of success of the model during training and validation. Doesn't need to be differentiable, as it is not used for gradient descent
+
+
 ## Generally useful links
 - https://developers.google.com/machine-learning/glossary
