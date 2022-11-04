@@ -239,9 +239,9 @@ train = remove_outlier_long_trips(train)
 train = drop_id_column(train)
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
-# write_histogram(train, train_histogram_path)
-# write_pickup_dropoff_scatterplot_map(train, train_map_path)
-# write_correlation_matrix_heatmap(train, correlation_heatmap_path)
+write_histogram(train, train_histogram_path)
+write_pickup_dropoff_scatterplot_map(train, train_map_path)
+write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
 train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
 
@@ -255,8 +255,7 @@ cfg = {'layers': [['relu', 64],
        'batch_size': 10000,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
-       # 'ols_features': [],
-       # 'ml_features': []
+       'x_vars' : x_vars
        }
 
 model = keras.Sequential()
@@ -281,6 +280,7 @@ shared.write_model_graph(model, model_graph_path)
 html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
 html_loss = shared.build_training_plot_html(history, 'loss')
 html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
+html_cfg = shared.convert_dict_to_html(cfg)
 if os.path.exists(model_accuracy_report_path):
     os.remove(model_accuracy_report_path)
 
@@ -288,5 +288,6 @@ with open(model_accuracy_report_path, 'a') as report:
     report.write(html_accuracy)
     report.write(html_loss)
     report.write(html_model_graph)
+    report.write(html_cfg)
     report.close()
     print('done writing report')
