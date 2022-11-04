@@ -5,7 +5,6 @@ import tensorflow as tf
 import pandas as pd
 import statsmodels.api as sm
 import numpy as np
-import pprint
 import matplotlib.pyplot as plt
 import seaborn as sn
 from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
@@ -13,6 +12,7 @@ import geopandas as gpd
 from matplotlib.lines import Line2D
 from sys import platform
 from datetime import datetime as dt
+import webbrowser
 if platform in ('darwin', 'win32'):
     import shared as shared
     import taxi_shared as taxi_shared
@@ -184,6 +184,29 @@ def get_train_test_val_split(train_original, val_frac, test_frac, y_var):
 
     return train_x, train_y, validation_x, validation_y, test_x, test_y
 
+def get_haversine_distance(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points, or all
+    pairwise points between two vectors.
+    """
+    # convert decimal degrees to radians
+    lon1, lat1, lon2, lat2 = map(lambda x: x/360.*(2*np.pi), [lon1, lat1, lon2, lat2])
+
+    # haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    km = 6367 * c
+
+    return km
+
+def assign_distance(df):
+    df['distance'] = get_haversine_distance(df['pickup_longitude'], df['pickup_latitude'],
+                                            df['dropoff_longitude'], df['dropoff_latitude'])
+
+    return df
+
 # todo one hot categorical variables
 # todo normalization
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
@@ -224,7 +247,8 @@ y_var = 'trip_duration'
 x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude', 'dropoff_latitude',
           'store_and_fwd_flag',
           'p_boro_man', 'd_boro_man', 'p_boro_bronx', 'd_boro_bronx', 'p_boro_brook', 'd_boro_brook', 'p_boro_queens',
-          'd_boro_queens', 'p_boro_si', 'd_boro_si'
+          'd_boro_queens', 'p_boro_si', 'd_boro_si',
+          'distance',
           ]
 
 shared.use_cpu_and_make_results_reproducible()
@@ -233,6 +257,7 @@ turn_off_scientific_notation()
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
+train = assign_distance(train)
 train = convert_categoricals_to_float(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_trips(train)
@@ -291,3 +316,4 @@ with open(model_accuracy_report_path, 'a') as report:
     report.write(html_cfg)
     report.close()
     print('done writing report')
+webbrowser.open(model_accuracy_report_path)
