@@ -2,7 +2,11 @@ import fiona
 import shapely.geometry
 import pandas as pd
 import os
-import ml.taxi.taxi_shared as taxi_shared
+from sys import platform
+if platform == 'darwin':
+    import taxi.taxi_shared as taxi_shared
+else:
+    import ml.taxi.taxi_shared as taxi_shared
 from datetime import datetime as dt
 import numpy as np
 

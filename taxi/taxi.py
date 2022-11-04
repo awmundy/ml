@@ -11,9 +11,14 @@ import seaborn as sn
 from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
 import geopandas as gpd
 from matplotlib.lines import Line2D
+from sys import platform
+if platform == 'darwin':
+    import shared as shared
+    import taxi_shared as taxi_shared
+else:
+    import ml.shared as shared
+    import ml.taxi.taxi_shared as taxi_shared
 
-import ml.shared as shared
-import ml.taxi.taxi_shared as taxi_shared
 
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
