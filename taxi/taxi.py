@@ -196,6 +196,7 @@ def get_train_test_val_split(train_original, val_frac, test_frac, y_var):
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
 
+# add graphviz to path for those who are blocked from updating it more directly
 if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
     os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
 
