@@ -12,6 +12,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor as ge
 import geopandas as gpd
 from matplotlib.lines import Line2D
 from sys import platform
+from datetime import datetime as dt
 if platform in ('darwin', 'win32'):
     import shared as shared
     import taxi_shared as taxi_shared
@@ -38,7 +39,7 @@ def convert_categoricals_to_float(df):
 def remove_outlier_long_trips(df):
     trip_cap = 7200
     msk = df['trip_duration'] >= trip_cap
-    print(f'removing {msk.sum()} trips lasting {7200/60/60} hours or longer')
+    print(f'removing {msk.sum()} trips lasting {trip_cap/60/60} hours or longer')
     df = df[~msk].copy()
 
     return df
@@ -149,7 +150,7 @@ def get_ols_error(train_x, train_y, test_x, test_y):
     return ols_error
 
 def prep_kaggle_test_data(kaggle_test_path):
-    dtypes, dt_cols = get_dtypes('kaggle_test')
+    dtypes, dt_cols = taxi_shared.get_dtypes('kaggle_test')
     kaggle_test = pd.read_csv(kaggle_test_path, dtype=dtypes, parse_dates=dt_cols)
     kaggle_test = convert_categoricals_to_float(kaggle_test)
     assert kaggle_test.notnull().all().all()
@@ -201,25 +202,33 @@ if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
     os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
 
 usr_dir = os.path.expanduser('~')
-train_path = f'{usr_dir}/Documents/ml_taxi/train.csv'
+run_time = dt.now().strftime('%Y_%m_%d_%H:%M:%S')
+run_dir = f'{usr_dir}/Documents/ml_taxi/runs/{run_time}/'
+os.makedirs(run_dir, exist_ok=True)
+
+# input file paths
+train_path = f'{usr_dir}/Documents/ml_taxi/train_w_boro.csv'
 kaggle_test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{usr_dir}/Documents/ml_taxi/nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-train_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_train.png'
-test_histogram_path = f'{usr_dir}/Documents/ml_taxi/histogram_test.png'
-train_map_path = f'{usr_dir}/Documents/ml_taxi/map_train.png'
-correlation_heatmap_path = f'{usr_dir}/Documents/ml_taxi/correlation_heatmap_train.png'
-model_graph_path = f'{usr_dir}/Documents/ml_taxi/model_graph.png'
-model_accuracy_report_path = f'{usr_dir}/Documents/ml_taxi/model_accuracy_report.html'
+
+# output file paths
+train_histogram_path = f'{run_dir}histogram_train.png'
+test_histogram_path = f'{run_dir}histogram_test.png'
+train_map_path = f'{run_dir}map_train.png'
+correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
+model_graph_path = f'{run_dir}model_graph.png'
+model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
 
 y_var = 'trip_duration'
-x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude',
-          'dropoff_latitude', 'store_and_fwd_flag']
+x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude', 'dropoff_latitude',
+          'store_and_fwd_flag',
+          'p_boro_man', 'd_boro_man', 'p_boro_bronx', 'd_boro_bronx', 'p_boro_brook', 'd_boro_brook', 'p_boro_queens',
+          'd_boro_queens', 'p_boro_si', 'd_boro_si'
+          ]
 
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
-
-# kaggle_test = prep_kaggle_test_data(kaggle_test_path)
 
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
