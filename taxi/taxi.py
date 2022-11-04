@@ -12,7 +12,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor as ge
 import geopandas as gpd
 from matplotlib.lines import Line2D
 from sys import platform
-if platform == 'darwin':
+if platform in ('darwin', 'win32'):
     import shared as shared
     import taxi_shared as taxi_shared
 else:
