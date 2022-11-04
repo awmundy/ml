@@ -220,11 +220,11 @@ def drop_records_with_no_price(df):
 
 
 usr_path = os.path.expanduser('~/')
-cfg = {'out_paths':{'training_log': f'{usr_path}/Desktop/housing/training_log.csv',
-                    'model_graph': f'{usr_path}/Desktop/housing/model_graph.png',
-                    'corr_heatmap': f'{usr_path}/Desktop/housing/corr_heatmap.png',
-                    'histogram': f'{usr_path}/Desktop/housing/histogram.png',
-                    'report': f'{usr_path}/Desktop/housing/housing_report.html'
+cfg = {'out_paths':{'training_log': f'{usr_path}Documents/ml_housing/training_log.csv',
+                    'model_graph': f'{usr_path}Documents/ml_housing/model_graph.png',
+                    'corr_heatmap': f'{usr_path}Documents/ml_housing/corr_heatmap.png',
+                    'histogram': f'{usr_path}Documents/ml_housing/histogram.png',
+                    'report': f'{usr_path}Documents/ml_housing/housing_report.html'
                     },
        'layers': [['relu', 64],
                   ['relu', 64],
