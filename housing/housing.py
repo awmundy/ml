@@ -1,6 +1,4 @@
 import os
-import tensorflow as tf
-from tensorflow.keras.datasets import mnist
 from tensorflow.keras import layers
 from tensorflow import keras
 import pandas as pd
@@ -8,10 +6,8 @@ import requests
 import statsmodels.api as sm
 from sklearn.model_selection import train_test_split
 import numpy as np
-import pprint
 import matplotlib.pyplot as plt
 import seaborn as sn
-import mpld3
 from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
 
 import ml.shared as shared
@@ -98,14 +94,6 @@ def build_prediction_error_html(pred_error, ols_error):
 
     return html
 
-def convert_dict_to_html(cfg):
-    html_lines = []
-    for line in pprint.pformat(cfg, sort_dicts=False).splitlines():
-        html_lines.append(f'<br/>{line}')
-    html = '\n'.join(html_lines)
-
-    return html
-
 def write_report(model, history, ols_error, test_labels, test_data, cfg):
 
     metric = cfg['metrics']
@@ -135,7 +123,7 @@ def write_report(model, history, ols_error, test_labels, test_data, cfg):
     html_loss = shared.build_training_plot_html(history, 'loss')
     html_training_log = shared.build_training_log_html(training_log_path)
     html_pred_error = build_prediction_error_html(pred_error, ols_error)
-    html_cfg = convert_dict_to_html(cfg)
+    html_cfg = shared.convert_dict_to_html(cfg)
     html_corr_heatmap = shared.read_image_as_html(corr_heatmap_path, 'Correlation Matrix')
     html_histogram = shared.read_image_as_html(histogram_path, 'Features Histogram')
     html_test_labels_describe = shared.build_test_labels_describe_html(test_labels_describe)

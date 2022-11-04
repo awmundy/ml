@@ -8,6 +8,7 @@ from numpy.random import seed as np_seed
 from random import seed as python_seed
 import os
 import tensorflow as tf
+import pprint
 
 
 def get_history_df(history, pretty_cols=False):
@@ -126,3 +127,11 @@ def use_cpu_and_make_results_reproducible():
     # numpy seed
     np_seed(1)
     tf.random.set_seed(2)
+
+def convert_dict_to_html(cfg):
+    html_lines = []
+    for line in pprint.pformat(cfg, sort_dicts=False).splitlines():
+        html_lines.append(f'<br/>{line}')
+    html = '\n'.join(html_lines)
+
+    return html
