@@ -12,7 +12,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor as ge
 import geopandas as gpd
 from matplotlib.lines import Line2D
 from sys import platform
-if platform == 'darwin':
+if platform in ('darwin', 'win32'):
     import shared as shared
     import taxi_shared as taxi_shared
 else:
@@ -196,6 +196,9 @@ def get_train_test_val_split(train_original, val_frac, test_frac, y_var):
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
 
+# add graphviz to path for those who are blocked from updating it more directly
+if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
+    os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
 
 usr_dir = os.path.expanduser('~')
 train_path = f'{usr_dir}/Documents/ml_taxi/train.csv'
