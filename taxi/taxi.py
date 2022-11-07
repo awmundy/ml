@@ -246,10 +246,6 @@ def add_weekends(df):
 # todo normalization
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
 # todo add feature: rounded lat long dummies (should improve ols)
-# todo add feature: day of week or weekday/not weekday
-# todo add feature: hour of day or morning/afternoon/night
-# todo add feature: straight line distance between pickup and dropoff
-# todo add feature: boroughs (either pickup borough/dropoff borough as separate column or store in single col)
 # todo add feature: interactions (e.g. bourough-time of day)
 # todo add feature: airport dummies
 # todo query google api to get distance between ~few hundred rounded lat long points,
@@ -297,9 +293,7 @@ x_vars.extend(time_vars_to_add)
 train, weekend_vars_to_add = add_weekends(train)
 x_vars.extend(weekend_vars_to_add)
 train = convert_categoricals_to_float(train)
-train = remove_0_passenger_count_trips(train)
-train = remove_outlier_long_trips(train)
-train = drop_id_column(train)
+
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
 write_histogram(train, train_histogram_path)
