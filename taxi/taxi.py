@@ -12,6 +12,7 @@ import geopandas as gpd
 from matplotlib.lines import Line2D
 from sys import platform
 from datetime import datetime as dt
+
 import webbrowser
 if platform in ('darwin', 'win32'):
     import shared as shared
@@ -207,6 +208,40 @@ def assign_distance(df):
 
     return df
 
+
+def add_time_frequencies(df,
+                         round_frequency='15min'):
+
+    time_series = df['pickup_datetime'].dt.round(round_frequency).dt.time
+    time_series = pd.get_dummies(time_series, prefix='pickup_time', dtype=float)
+    vars_to_add = time_series.columns.tolist()
+    shape_check = df.shape[0]
+    df = df.join(time_series)
+    assert shape_check == df.shape[0],\
+        f"YOU CLEARLY SHOULD GO BACK TO ACCOUNTING {shape_check == df.shape[0]}. Check your join"
+    return df, vars_to_add
+
+def add_weekends(df):
+    weekdays = df['pickup_datetime'].dt.weekday
+    weekend_weekday = pd.Series(np.where(weekdays.between(4,6),'weekend', 'weekday'), weekdays.index)
+    days_of_week_map = {0:'monday',
+           1:'tuesday',
+           2:'wednesday',
+           3:'thursday',
+           4:'friday',
+           5:'saturday',
+           6:'sunday'}
+    day_of_the_week = weekdays.replace(days_of_week_map)
+    combo = weekend_weekday.to_frame('day_type').join(day_of_the_week)
+    weekday_dummies = pd.get_dummies(combo, dtype=float)
+    vars_to_add = weekday_dummies.columns.tolist()
+
+    shape_check = df.shape[0]
+    df = df.join(weekday_dummies)
+    assert shape_check == df.shape[0], \
+        f"YOU CLEARLY SHOULD GO BACK TO ACCOUNTING {shape_check == df.shape[0]}. Check your join"
+    return df, vars_to_add
+
 # todo one hot categorical variables
 # todo normalization
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
@@ -234,7 +269,6 @@ train_path = f'{usr_dir}/Documents/ml_taxi/train_w_boro.csv'
 kaggle_test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{usr_dir}/Documents/ml_taxi/nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-
 # output file paths
 train_histogram_path = f'{run_dir}histogram_train.png'
 test_histogram_path = f'{run_dir}histogram_test.png'
@@ -258,6 +292,10 @@ turn_off_scientific_notation()
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = assign_distance(train)
+train, time_vars_to_add = add_time_frequencies(train, '1H')
+x_vars.extend(time_vars_to_add)
+train, weekend_vars_to_add = add_weekends(train)
+x_vars.extend(weekend_vars_to_add)
 train = convert_categoricals_to_float(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_trips(train)
