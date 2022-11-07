@@ -2,7 +2,7 @@ def get_dtypes(dataset):
     assert dataset in ['train', 'kaggle_test']
 
     dtypes = {'id': 'str',
-              'vendor_id': 'str',
+              'vendor_id': 'float',
               'passenger_count': 'float',
               'pickup_longitude': 'float',
               'pickup_latitude': 'float',

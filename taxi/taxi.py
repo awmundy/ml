@@ -12,15 +12,14 @@ import geopandas as gpd
 from matplotlib.lines import Line2D
 from sys import platform
 from datetime import datetime as dt
-
 import webbrowser
+
 if platform in ('darwin', 'win32'):
     import shared as shared
     import taxi_shared as taxi_shared
 else:
     import ml.shared as shared
     import ml.taxi.taxi_shared as taxi_shared
-
 
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -202,16 +201,14 @@ def get_haversine_distance(lon1, lat1, lon2, lat2):
 
     return km
 
-def assign_distance(df):
+def assign_distance(df, x_vars):
     df['distance'] = get_haversine_distance(df['pickup_longitude'], df['pickup_latitude'],
                                             df['dropoff_longitude'], df['dropoff_latitude'])
+    x_vars += ['distance']
 
-    return df
+    return df, x_vars
 
-
-def add_time_frequencies(df,
-                         round_frequency='15min'):
-
+def add_time_frequencies(df, x_vars, round_frequency='15min'):
     time_series = df['pickup_datetime'].dt.round(round_frequency).dt.time
     time_series = pd.get_dummies(time_series, prefix='pickup_time', dtype=float)
     vars_to_add = time_series.columns.tolist()
@@ -219,28 +216,32 @@ def add_time_frequencies(df,
     df = df.join(time_series)
     assert shape_check == df.shape[0],\
         f"YOU CLEARLY SHOULD GO BACK TO ACCOUNTING {shape_check == df.shape[0]}. Check your join"
-    return df, vars_to_add
+    x_vars += vars_to_add
 
-def add_weekends(df):
+    return df, x_vars
+
+def add_weekends(df, x_vars):
     weekdays = df['pickup_datetime'].dt.weekday
     weekend_weekday = pd.Series(np.where(weekdays.between(4,6),'weekend', 'weekday'), weekdays.index)
     days_of_week_map = {0:'monday',
-           1:'tuesday',
-           2:'wednesday',
-           3:'thursday',
-           4:'friday',
-           5:'saturday',
-           6:'sunday'}
+                        1:'tuesday',
+                        2:'wednesday',
+                        3:'thursday',
+                        4:'friday',
+                        5:'saturday',
+                        6:'sunday'}
     day_of_the_week = weekdays.replace(days_of_week_map)
     combo = weekend_weekday.to_frame('day_type').join(day_of_the_week)
     weekday_dummies = pd.get_dummies(combo, dtype=float)
     vars_to_add = weekday_dummies.columns.tolist()
+    x_vars += vars_to_add
 
     shape_check = df.shape[0]
     df = df.join(weekday_dummies)
     assert shape_check == df.shape[0], \
         f"YOU CLEARLY SHOULD GO BACK TO ACCOUNTING {shape_check == df.shape[0]}. Check your join"
-    return df, vars_to_add
+
+    return df, x_vars
 
 # todo one hot categorical variables
 # todo normalization
@@ -273,12 +274,7 @@ correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
 model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
 y_var = 'trip_duration'
-x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude', 'dropoff_latitude',
-          'store_and_fwd_flag',
-          'p_boro_man', 'd_boro_man', 'p_boro_bronx', 'd_boro_bronx', 'p_boro_brook', 'd_boro_brook', 'p_boro_queens',
-          'd_boro_queens', 'p_boro_si', 'd_boro_si',
-          'distance',
-          ]
+x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
 cfg = {'layers': [['relu', 64],
                   ['relu', 64],
                   ['linear', 1]],
@@ -298,11 +294,9 @@ train = remove_outlier_long_trips(train)
 train = drop_id_column(train)
 train = convert_categoricals_to_float(train)
 
-train = assign_distance(train)
-train, time_vars_to_add = add_time_frequencies(train, '1H')
-x_vars.extend(time_vars_to_add)
-train, weekend_vars_to_add = add_weekends(train)
-x_vars.extend(weekend_vars_to_add)
+train, x_vars = assign_distance(train, x_vars)
+train, x_vars = add_time_frequencies(train, x_vars, '1H')
+train, x_vars = add_weekends(train, x_vars)
 
 cfg['x_vars'] = x_vars
 train = train[x_vars + [y_var]].copy()
@@ -314,7 +308,8 @@ write_histogram(train, train_histogram_path)
 write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
 train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
-ols_error = get_ols_error(train_x, train_y, test_x, test_y)
+# todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
+# ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 
 model = keras.Sequential()
 for activation, size in cfg['layers']:
