@@ -272,7 +272,6 @@ train_map_path = f'{run_dir}map_train.png'
 correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
 model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
-
 y_var = 'trip_duration'
 x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_longitude', 'dropoff_latitude',
           'store_and_fwd_flag',
@@ -280,31 +279,6 @@ x_vars = ['passenger_count', 'pickup_longitude', 'pickup_latitude', 'dropoff_lon
           'd_boro_queens', 'p_boro_si', 'd_boro_si',
           'distance',
           ]
-
-shared.use_cpu_and_make_results_reproducible()
-turn_off_scientific_notation()
-
-
-dtypes, dt_cols = taxi_shared.get_dtypes('train')
-train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
-train = assign_distance(train)
-train, time_vars_to_add = add_time_frequencies(train, '1H')
-x_vars.extend(time_vars_to_add)
-train, weekend_vars_to_add = add_weekends(train)
-x_vars.extend(weekend_vars_to_add)
-train = convert_categoricals_to_float(train)
-
-train = train[x_vars + [y_var]].copy()
-assert train.notnull().all().all()
-write_histogram(train, train_histogram_path)
-write_pickup_dropoff_scatterplot_map(train, train_map_path)
-write_correlation_matrix_heatmap(train, correlation_heatmap_path)
-
-train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
-
-ols_error = get_ols_error(train_x, train_y, test_x, test_y)
-
-
 cfg = {'layers': [['relu', 64],
                   ['relu', 64],
                   ['linear', 1]],
@@ -312,8 +286,35 @@ cfg = {'layers': [['relu', 64],
        'batch_size': 10000,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
-       'x_vars' : x_vars
        }
+shared.use_cpu_and_make_results_reproducible()
+turn_off_scientific_notation()
+
+
+dtypes, dt_cols = taxi_shared.get_dtypes('train')
+train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
+train = remove_0_passenger_count_trips(train)
+train = remove_outlier_long_trips(train)
+train = drop_id_column(train)
+train = convert_categoricals_to_float(train)
+
+train = assign_distance(train)
+train, time_vars_to_add = add_time_frequencies(train, '1H')
+x_vars.extend(time_vars_to_add)
+train, weekend_vars_to_add = add_weekends(train)
+x_vars.extend(weekend_vars_to_add)
+
+cfg['x_vars'] = x_vars
+train = train[x_vars + [y_var]].copy()
+assert train.notnull().all().all()
+
+# write out some eda plots
+write_histogram(train, train_histogram_path)
+# write_pickup_dropoff_scatterplot_map(train, train_map_path)
+write_correlation_matrix_heatmap(train, correlation_heatmap_path)
+
+train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
+ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 
 model = keras.Sequential()
 for activation, size in cfg['layers']:
