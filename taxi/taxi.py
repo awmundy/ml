@@ -277,6 +277,8 @@ y_var = 'trip_duration'
 x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
 cfg = {'layers': [['relu', 64],
                   ['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
                   ['linear', 1]],
        'epochs': 30,
        'batch_size': 10000,
