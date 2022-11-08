@@ -27,8 +27,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 def write_histogram(df, output_path):
     ignore_cols = ['id']
     histogram_cols = [x for x in df if x not in ignore_cols]
+    hist = df[histogram_cols].hist(figsize=(20,20))
 
-    hist = df[histogram_cols].hist(figsize=(10,10))
     plt.savefig(output_path)
 
 def convert_categoricals_to_float(df):
@@ -36,7 +36,7 @@ def convert_categoricals_to_float(df):
     df['vendor_id'] = df['vendor_id'].astype(float)
     return df
 
-def remove_outlier_long_trips(df):
+def remove_outlier_long_duration_trips(df):
     trip_cap = 7200
     msk = df['trip_duration'] >= trip_cap
     print(f'removing {msk.sum()} trips lasting {trip_cap/60/60} hours or longer')
@@ -243,6 +243,14 @@ def add_weekends(df, x_vars):
 
     return df, x_vars
 
+def remove_outlier_long_distance_trips(df):
+    outlier_distance = 30
+    msk = df['distance'] > outlier_distance
+    print(f'removing {msk.sum()} trips with distances longer than {outlier_distance}')
+    df = df[~msk].copy()
+
+    return df
+
 # todo one hot categorical variables
 # todo normalization
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
@@ -274,6 +282,7 @@ correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
 model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
 y_var = 'trip_duration'
+# x vars that will definitely be in the model, later vars get optionally added downstream
 x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
@@ -282,11 +291,12 @@ turn_off_scientific_notation()
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = remove_0_passenger_count_trips(train)
-train = remove_outlier_long_trips(train)
+train = remove_outlier_long_duration_trips(train)
 train = drop_id_column(train)
 train = convert_categoricals_to_float(train)
 
 train, x_vars = assign_distance(train, x_vars)
+train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
 
@@ -341,8 +351,8 @@ if os.path.exists(model_accuracy_report_path):
     os.remove(model_accuracy_report_path)
 
 with open(model_accuracy_report_path, 'a') as report:
-    report.write(html_accuracy)
     report.write(html_loss)
+    report.write(html_accuracy)
     report.write(html_model_graph)
     report.write(html_cfg)
     report.close()
