@@ -275,16 +275,6 @@ model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
 y_var = 'trip_duration'
 x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
-cfg = {'layers': [['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['linear', 1]],
-       'epochs': 30,
-       'batch_size': 10000,
-       'loss': 'mae',
-       'metrics': ['mean_squared_logarithmic_error'],
-       }
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
 
@@ -300,7 +290,6 @@ train, x_vars = assign_distance(train, x_vars)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
 
-cfg['x_vars'] = x_vars
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
 
@@ -312,6 +301,18 @@ write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # ols_error = get_ols_error(train_x, train_y, test_x, test_y)
+
+cfg = {'layers': [['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
+                  ['linear', 1]],
+       'epochs': 30,
+       'batch_size': 10000,
+       'loss': 'mae',
+       'metrics': ['mean_squared_logarithmic_error'],
+       }
+cfg['x_vars'] = x_vars
 
 model = keras.Sequential()
 for activation, size in cfg['layers']:
