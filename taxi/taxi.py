@@ -258,7 +258,7 @@ def write_history_df(history, history_path):
 def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path):
     new_val_loss = history.history['val_loss'][-1]
     old_val_loss = pd.read_csv(run_to_compare_against_history_path)['val_loss'].values[-1]
-    improvement = round(new_val_loss - old_val_loss, 3)
+    improvement = round(old_val_loss - new_val_loss, 3)
     old_run_label = run_to_compare_against_history_path.split('/')[-2]
 
     html =  f"""
@@ -364,6 +364,7 @@ cfg = {'layers': [['relu', 64],
                   ['linear', 1]],
        'epochs': 10,
        'batch_size': 10000,
+       'learning_rate': .01,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
        }
@@ -373,7 +374,7 @@ model = keras.Sequential()
 for activation, size in cfg['layers']:
     model.add(layers.Dense(size, activation=activation))
 
-model.compile(optimizer=keras.optimizers.RMSprop(),
+model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
               loss=cfg['loss'],
               metrics=cfg['metrics'])
 
