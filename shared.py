@@ -60,7 +60,7 @@ def build_training_plot_html(history, plot_type):
     # plot
     plt.plot(df['epoch'], df[y_col_1], "bo", label=y_col_1_label)
     plt.plot(df['epoch'], df[y_col_2], "b", label=y_col_2_label)
-    plt.title(title)
+    plt.title(title, fontdict={'fontsize': 16, 'fontweight': 'bold'})
     plt.xlabel("Epochs")
     plt.ylabel(plot_type)
     plt.legend()

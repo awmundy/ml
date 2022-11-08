@@ -251,6 +251,30 @@ def remove_outlier_long_distance_trips(df):
 
     return df
 
+def write_history_df(history, history_path):
+    hist_df =pd.DataFrame(history.history)
+    hist_df.to_csv(history_path, index=False)
+
+def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path):
+    new_val_loss = history.history['val_loss'][-1]
+    old_val_loss = pd.read_csv(run_to_compare_against_history_path)['val_loss'].values[-1]
+    improvement = round(new_val_loss - old_val_loss, 3)
+    old_run_label = run_to_compare_against_history_path.split('/')[-2]
+
+    html =  f"""
+    <html>
+      <head>
+      </head>
+      <body>
+        <h3>Improvement in final epoch validation loss compared to run: {old_run_label}</h3>
+        <h4>{improvement}</h4>
+      </body>
+    </html>
+    """
+
+    return html
+
+
 # todo one hot categorical variables
 # todo normalization
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
@@ -260,6 +284,9 @@ def remove_outlier_long_distance_trips(df):
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
 
+shared.use_cpu_and_make_results_reproducible()
+turn_off_scientific_notation()
+
 # add graphviz to path for those who are blocked from updating it more directly
 if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
     os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
@@ -267,13 +294,16 @@ if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
 usr_dir = os.path.expanduser('~')
 run_time = dt.now().strftime('%Y_%m_%d_%H:%M:%S')
 run_dir = f'{usr_dir}/Documents/ml_taxi/runs/{run_time}/'
+inputs_dir = f'{usr_dir}/Documents/ml_taxi/'
 os.makedirs(run_dir, exist_ok=True)
 
 # input file paths
-train_path = f'{usr_dir}/Documents/ml_taxi/train_w_boro.csv'
-kaggle_test_path = f'{usr_dir}/Documents/ml_taxi/test.csv'
+train_path = f'{inputs_dir}train_w_boro.csv'
+kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
-nyc_boundary_path = f'{usr_dir}/Documents/ml_taxi/nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
+nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_13:45:00/history.csv'
+
 # output file paths
 train_histogram_path = f'{run_dir}histogram_train.png'
 test_histogram_path = f'{run_dir}histogram_test.png'
@@ -281,11 +311,13 @@ train_map_path = f'{run_dir}map_train.png'
 correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
 model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
+history_path = f'{run_dir}history.csv'
+
+# variables
 y_var = 'trip_duration'
 # x vars that will definitely be in the model, later vars get optionally added downstream
 x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
-shared.use_cpu_and_make_results_reproducible()
-turn_off_scientific_notation()
+
 
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
@@ -316,6 +348,7 @@ cfg = {'layers': [['relu', 64],
                   ['relu', 64],
                   ['relu', 64],
                   ['relu', 64],
+                  ['relu', 64],
                   ['linear', 1]],
        'epochs': 30,
        'batch_size': 10000,
@@ -342,15 +375,23 @@ history = model.fit(train_x,
                     # verbose=0
                     )
 
+# miscellaneous writes
+write_history_df(history, history_path)
 shared.write_model_graph(model, model_graph_path)
+
+# convert plots, etc to html
+html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
 html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
 html_loss = shared.build_training_plot_html(history, 'loss')
-html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
 html_cfg = shared.convert_dict_to_html(cfg)
+html_val_loss_improvement = \
+    build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path)
+
+# write out report
 if os.path.exists(model_accuracy_report_path):
     os.remove(model_accuracy_report_path)
-
 with open(model_accuracy_report_path, 'a') as report:
+    report.write(html_val_loss_improvement)
     report.write(html_loss)
     report.write(html_accuracy)
     report.write(html_model_graph)
