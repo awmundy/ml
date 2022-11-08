@@ -274,6 +274,16 @@ def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_com
 
     return html
 
+def normalize(df):
+    norm_cols = ['passenger_count', 'distance']
+
+    # for each col to be normalized, subtract the mean and divide by the standard deviation to normalize
+    mean = df[norm_cols].mean(axis=0)
+    df[norm_cols] -= mean
+    std = df[norm_cols].std(axis=0)
+    df[norm_cols] /= std
+
+    return df
 
 # todo one hot categorical variables
 # todo normalization
@@ -302,7 +312,7 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_13:45:00/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_14:06:35/history.csv'
 
 # output file paths
 train_histogram_path = f'{run_dir}histogram_train.png'
@@ -318,8 +328,6 @@ y_var = 'trip_duration'
 # x vars that will definitely be in the model, later vars get optionally added downstream
 x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
 
-
-
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
 train = remove_0_passenger_count_trips(train)
@@ -331,6 +339,7 @@ train, x_vars = assign_distance(train, x_vars)
 train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
+train = normalize(train)
 
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
@@ -350,7 +359,7 @@ cfg = {'layers': [['relu', 64],
                   ['relu', 64],
                   ['relu', 64],
                   ['linear', 1]],
-       'epochs': 30,
+       'epochs': 10,
        'batch_size': 10000,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
