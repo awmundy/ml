@@ -131,12 +131,12 @@ def drop_id_column(df):
 
 def get_ols_error(train_x, train_y, test_x, test_y):
 
-    for idx, col in enumerate(train_x.columns):
-        vif = get_vif(train_x, idx)
-        # todo is a high vif for the constant acceptable
-        if (vif > 10) & (col != 'constant'):
-            print(f'VIF for {col} is {vif} which is too high')
-
+    # for idx, col in enumerate(train_x.columns):
+        # vif = get_vif(train_x, idx)
+        # print(col, vif)
+        # # todo is a high vif for the constant acceptable
+        # if (vif > 10) & (col != 'constant'):
+        #     print(f'VIF for {col} is {vif} which is too high')
 
     model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
     res = model.fit()
@@ -252,7 +252,7 @@ def remove_outlier_long_distance_trips(df):
     return df
 
 def write_history_df(history, history_path):
-    hist_df =pd.DataFrame(history.history)
+    hist_df = shared.get_history_df(history)
     hist_df.to_csv(history_path, index=False)
 
 def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path):
@@ -292,6 +292,7 @@ def normalize(df):
 # todo add feature: airport dummies
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
+# todo try automated hyperparameter tuning with keras tuner
 
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
@@ -311,7 +312,7 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_14:06:35/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_15:46:42/history.csv'
 
 # output file paths
 train_histogram_path = f'{run_dir}histogram_train.png'
@@ -354,13 +355,10 @@ write_histogram(train, train_histogram_path)
 write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
 train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
-# ols_error = get_ols_error(train_x, train_y, test_x, test_y)
+ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 
-cfg = {'layers': [['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
+cfg = {'layers': [['relu', 128],
+                  ['relu', 128],
                   ['linear', 1]],
        'epochs': 10,
        'batch_size': 10000,
@@ -395,7 +393,7 @@ shared.write_model_graph(model, model_graph_path)
 # convert plots, etc to html
 html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
 html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
-html_loss = shared.build_training_plot_html(history, 'loss')
+html_loss = shared.build_training_plot_html(history, 'loss', ols_error)
 html_cfg = shared.convert_dict_to_html(cfg)
 html_val_loss_improvement = \
     build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path)

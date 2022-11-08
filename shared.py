@@ -32,7 +32,7 @@ def read_image_as_html(image_path, image_title=None):
     """
     return html
 
-def build_training_plot_html(history, plot_type):
+def build_training_plot_html(history, plot_type, benchmark=None):
     df = get_history_df(history)
 
     if plot_type not in df:
@@ -58,12 +58,15 @@ def build_training_plot_html(history, plot_type):
         ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1.0))
 
     # plot
+    if benchmark:
+        plt.axhline(y=benchmark, color='r', linestyle='-', label='benchmark'),
     plt.plot(df['epoch'], df[y_col_1], "bo", label=y_col_1_label)
     plt.plot(df['epoch'], df[y_col_2], "b", label=y_col_2_label)
     plt.title(title, fontdict={'fontsize': 16, 'fontweight': 'bold'})
     plt.xlabel("Epochs")
     plt.ylabel(plot_type)
     plt.legend()
+    plt.show()
 
     html = mpld3.fig_to_html(fig)
 
