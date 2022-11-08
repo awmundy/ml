@@ -270,7 +270,7 @@ def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_com
       <head>
       </head>
       <body>
-        <h3>Improvement in final epoch validation loss compared to run: {old_run_label}</h3>
+        <h3>{title}</h3>
         <h4>{improvement}</h4>
       </body>
     </html>
