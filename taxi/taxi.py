@@ -285,11 +285,10 @@ def normalize(df):
 
     return df
 
-# todo one hot categorical variables
-# todo normalization
+# todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
 # todo add feature: rounded lat long dummies (should improve ols)
-# todo add feature: interactions (e.g. bourough-time of day)
+# todo add feature: interactions (e.g. borough-time of day)
 # todo add feature: airport dummies
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
@@ -326,7 +325,12 @@ history_path = f'{run_dir}history.csv'
 # variables
 y_var = 'trip_duration'
 # x vars that will definitely be in the model, later vars get optionally added downstream
-x_vars = ['vendor_id', 'passenger_count', 'store_and_fwd_flag']
+x_vars = [
+    'd_boro_bronx', 'd_boro_brook', 'd_boro_man', 'd_boro_queens', 'd_boro_si',
+    'p_boro_bronx', 'p_boro_brook', 'p_boro_man', 'p_boro_queens', 'p_boro_si',
+    'passenger_count', 'store_and_fwd_flag', 'vendor_id',
+    ]
+
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
@@ -350,7 +354,6 @@ write_histogram(train, train_histogram_path)
 write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
 train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
-# todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 
 cfg = {'layers': [['relu', 64],
