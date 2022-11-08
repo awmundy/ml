@@ -256,11 +256,15 @@ def write_history_df(history, history_path):
     hist_df.to_csv(history_path, index=False)
 
 def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path):
-    new_val_loss = history.history['val_loss'][-1]
-    old_val_loss = pd.read_csv(run_to_compare_against_history_path)['val_loss'].values[-1]
-    improvement = round(old_val_loss - new_val_loss, 3)
-    old_run_label = run_to_compare_against_history_path.split('/')[-2]
-
+    if os.path.exists(run_to_compare_against_history_path):
+        new_val_loss = history.history['val_loss'][-1]
+        old_val_loss = pd.read_csv(run_to_compare_against_history_path)['val_loss'].values[-1]
+        improvement = round(old_val_loss - new_val_loss, 3)
+        old_run_label = run_to_compare_against_history_path.split('/')[-2]
+        title = f'Improvement in final epoch validation loss compared to run: {old_run_label}'
+    else:
+        title = 'No valid previous run given to compare against'
+        improvement = 'N/A'
     html =  f"""
     <html>
       <head>
