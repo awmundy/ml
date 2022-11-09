@@ -279,7 +279,14 @@ def build_val_loss_improvement_compared_to_previous_run_html(history, run_to_com
     return html
 
 def normalize(df):
-    norm_cols = ['passenger_count', 'distance']
+    potential_norm_cols = ['passenger_count', 'distance',
+                           'pickup_latitude', 'pickup_longitude',
+                           'dropoff_latitude', 'dropoff_longitude',]
+    norm_cols = []
+    for col in potential_norm_cols:
+        if col in df:
+            norm_cols += [col]
+    print(f'normalizing {norm_cols}')
 
     # for each col to be normalized, subtract the mean and divide by the standard deviation to normalize
     mean = df[norm_cols].mean(axis=0)
@@ -316,7 +323,7 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_15:46:42/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_21:24:46/history.csv'
 
 # output file paths
 train_histogram_path = f'{run_dir}histogram_train.png'
@@ -331,9 +338,11 @@ history_path = f'{run_dir}history.csv'
 y_var = 'trip_duration'
 # x vars that will definitely be in the model, later vars get optionally added downstream
 x_vars = [
-    'd_boro_bronx', 'd_boro_brook', 'd_boro_man', 'd_boro_queens', 'd_boro_si',
-    'p_boro_bronx', 'p_boro_brook', 'p_boro_man', 'p_boro_queens', 'p_boro_si',
+    # 'd_boro_bronx', 'd_boro_brook', 'd_boro_man', 'd_boro_queens', 'd_boro_si',
+    # 'p_boro_bronx', 'p_boro_brook', 'p_boro_man', 'p_boro_queens', 'p_boro_si',
     'passenger_count', 'store_and_fwd_flag', 'vendor_id',
+    'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
+
     ]
 
 
@@ -344,8 +353,8 @@ train = remove_outlier_long_duration_trips(train)
 train = drop_id_column(train)
 train = convert_categoricals_to_float(train)
 
-train, x_vars = assign_distance(train, x_vars)
-train = remove_outlier_long_distance_trips(train)
+# train, x_vars = assign_distance(train, x_vars)
+# train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
 train = normalize(train)
@@ -358,13 +367,19 @@ write_histogram(train, train_histogram_path)
 # write_pickup_dropoff_scatterplot_map(train, train_map_path)
 write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
-train_x, train_y, validation_x, validation_y, test_x, test_y = get_train_test_val_split(train, .1, .1, y_var)
+train_x, train_y, validation_x, validation_y, test_x, test_y = \
+    get_train_test_val_split(train, .1, .1, y_var)
 ols_error = get_ols_error(train_x, train_y, test_x, test_y)
 
-cfg = {'layers': [['relu', 128],
-                  ['relu', 128],
+cfg = {'layers': [['relu', 256],
+                  ['relu', 256],
+                  ['relu', 256],
+                  ['relu', 256],
+                  # ['relu', 128],
+                  # ['relu', 128],
+                  # ['relu', 128],
                   ['linear', 1]],
-       'epochs': 10,
+       'epochs': 50,
        'batch_size': 10000,
        'learning_rate': .01,
        'loss': 'mae',
