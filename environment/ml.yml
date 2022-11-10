@@ -12,6 +12,7 @@ dependencies:
   - mpld3
   - numpy
   - pandas
+  - pip
   - plotly
   - python
   - pydot
