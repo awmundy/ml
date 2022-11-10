@@ -3,13 +3,11 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - boto3
   - fastparquet
   - geopandas
   - h5py
   - jupyter
   - keras
-  - lightgbm
   - matplotlib
   - mpld3
   - numpy
@@ -19,7 +17,8 @@ dependencies:
   - pydot
   - scikit-learn
   - scipy
-  - tensorflow-gpu
-  - xgboost
+  - pip:
+      - lightgbm
+      - xgboost
 prefix: ~/miniconda3/envs/ml
 
