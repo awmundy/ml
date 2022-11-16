@@ -1,4 +1,7 @@
 import os
+
+# turn off tensorflow info messages about e.g. cpu optimization features
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 from tensorflow.keras import layers
 from tensorflow import keras
 import tensorflow as tf
@@ -15,6 +18,7 @@ matplotlib.use("Qt5Agg")
 from sys import platform
 from datetime import datetime as dt
 import webbrowser
+import keras_tuner as kt
 
 pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 500)
@@ -27,8 +31,6 @@ else:
     import ml.shared as shared
     import ml.taxi.taxi_shared as taxi_shared
 
-# turn off tensorflow info messages about e.g. cpu optimization features
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 def write_histogram(df, output_path):
     ignore_cols = ['id']
@@ -102,7 +104,7 @@ def write_pickup_dropoff_scatterplot_map(train, train_map_path):
 
     # zoom in on the area these points are in
     minx = min(pickup_gdf['pickup_longitude'].min(), dropoff_gdf['dropoff_longitude'].min()) - .01
-    maxx = min(pickup_gdf['pickup_longitude'].max(), dropoff_gdf['dropoff_longitude'].max()) +.01
+    maxx = min(pickup_gdf['pickup_longitude'].max(), dropoff_gdf['dropoff_longitude'].max()) + .01
     miny = min(pickup_gdf['pickup_latitude'].min(), dropoff_gdf['dropoff_latitude'].min()) - .01
     maxy = min(pickup_gdf['pickup_latitude'].max(), dropoff_gdf['dropoff_latitude'].max()) + .01
     ax.set_xlim(minx, maxx)
@@ -127,7 +129,7 @@ def write_correlation_matrix_heatmap(train, out_path):
     hm.set_yticklabels(hm.get_ymajorticklabels(), fontsize=16, rotation=30)
     # make sure laels are on top and bottom
     plt.tick_params(axis='both', which='major',
-                    labelbottom = True, bottom=True, top = False, labeltop=True)
+                    labelbottom=True, bottom=True, top=False, labeltop=True)
     plt.savefig(out_path)
 
 def drop_id_column(df):
@@ -146,7 +148,7 @@ def get_ols_error(train_x, train_y, test_x, test_y):
 
     model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
     res = model.fit()
-    print(res.summary2())
+    # print(res.summary2())
     ols_pred = res.predict(test_x)
 
     # construct mean absolute error
@@ -345,7 +347,7 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_21:24:46/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_15_07:39:56/history.csv'
 
 # output file paths
 train_histogram_path = f'{run_dir}histogram_train.png'
@@ -355,6 +357,7 @@ correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
 model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
 history_path = f'{run_dir}history.csv'
+tuning_dir = f'{usr_dir}/hyperparam_tuning/{run_time}/'
 
 # variables
 y_var = 'trip_duration'
@@ -365,66 +368,109 @@ x_vars = [
     'const', 'passenger_count', 'store_and_fwd_flag', 'vendor_id',
     'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
     ]
-#x_vars = ['const']
-
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
-train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
-#train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols, nrows=100000)
-print(len(train))
-
-
-train = add_const(train)
+train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols,
+                    nrows=10000  # todo remove when done demoing tuning
+                    )
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_duration_trips(train)
 train = drop_id_column(train)
 train = convert_categoricals_to_float(train)
 
-train, x_vars = assign_distance(train, x_vars)
+# train, x_vars = assign_distance(train, x_vars)
 # train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
-
-
 train = normalize(train)
 
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
 
 # write out some eda plots
-# write_histogram(train, train_histogram_path)
+write_histogram(train, train_histogram_path)
 # write_pickup_dropoff_scatterplot_map(train, train_map_path)
-# write_correlation_matrix_heatmap(train, correlation_heatmap_path)
+write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
 train_x, train_y, validation_x, validation_y, test_x, test_y = \
     get_train_test_val_split(train, .1, .1, y_var)
 ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
-print(ols_error, ols_rmsle)
+# print(ols_error, ols_rmsle)
 
-
-cfg = {'layers': [['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['linear', 1]],
-       'epochs': 150,
-       'batch_size': 10000,
-       'learning_rate': .01,
-       'loss': 'mae',
-       'metrics': ['mean_squared_logarithmic_error'],
-       }
+cfg = {
+    'layers': [['relu', 256],
+               ['relu', 256],
+               ['relu', 128],
+               ['relu', 128],
+               ['relu', 128],
+               ['linear', 1]],
+    'epochs': 20,
+    'batch_size': 1000,
+    'learning_rate': .01,
+    'loss': 'mae',
+    'metrics': ['mean_squared_logarithmic_error'],
+    }
 cfg['x_vars'] = x_vars
 
 
-model = keras.Sequential()
-for activation, size in cfg['layers']:
-    model.add(layers.Dense(size, activation=activation))
+# todo add tuning for batch size
+#   - https://keras.io/guides/keras_tuner/getting_started/#tune-model-training
+def model_builder(hp):
+    '''
+    hp: kt.engine.hyperparameters.HyperParameters object
+    '''
+    model = keras.Sequential()
 
-model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
-              loss=cfg['loss'],
-              metrics=cfg['metrics'])
+    # tune number of layers
+    for i in range(hp.Int('num_of_layers', 1, 2)):
+        # tune layer size
+        model.add(keras.layers.Dense(units=hp.Int('#_nodes_l' + str(i),
+                                                  min_value=32,
+                                                  max_value=64,
+                                                  step=32),
+                                     activation='relu'))
+
+    model.add(keras.layers.Dense(1, activation='linear'))
+
+    # tune learning rate
+    hp_learning_rate = hp.Choice('learning_rate', values=[.01, .001])
+
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
+                  loss='mae',
+                  metrics=['mean_squared_logarithmic_error'])
+
+    return model
+
+
+# construct tuner object
+tuner = kt.Hyperband(model_builder,
+                     objective='mean_squared_logarithmic_error',
+                     max_epochs=10,
+                     directory=tuning_dir,
+                     project_name='intro_to_kt')
+# add early stopping if the metric doesn't improve after <patience> epochs
+stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+
+# iterate through the hyperparam options, discovering the best ones
+tuner.search(train_x, train_y, epochs=10, shuffle=False,
+             validation_data=(validation_x, validation_y), callbacks=[stop_early])
+
+# summary of the space of hyperparameters being evaluated (e.g. layer size range, learning rate range)
+print(tuner.search_space_summary())
+
+# extract best hyperparams from the search
+#   (num trials is how many of the best hyperparam sets to return)
+best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+print(best_hps.values)
+model = tuner.hypermodel.build(best_hps)
+
+# model = keras.Sequential()
+# for activation, size in cfg['layers']:
+#     model.add(layers.Dense(size, activation=activation))
+#
+# model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
+#               loss=cfg['loss'],
+#               metrics=cfg['metrics'])
 
 history = model.fit(train_x,
                     train_y,
