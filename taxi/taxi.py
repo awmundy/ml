@@ -18,7 +18,7 @@ from sys import platform
 from datetime import datetime as dt
 import webbrowser
 import keras_tuner as kt
-from tensorboard.plugins.hparams import api as hpa
+from tensorboard import program
 
 pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 500)
@@ -318,110 +318,10 @@ def copy_lat_long(df):
     df.insert(0, 'pick_lat_raw', df['pickup_latitude'])
     return df
 
-
-
-# todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
-# todo implement root mean squared logarithmic error as the error metric (for ols as well?)
-# todo add feature: rounded lat long dummies (should improve ols)
-# todo add feature: interactions (e.g. borough-time of day)
-# todo add feature: airport dummies
-# todo query google api to get distance between ~few hundred rounded lat long points,
-#  built dataset of road distances between these points
-# todo try automated hyperparameter tuning with keras tuner
-
-shared.use_cpu_and_make_results_reproducible()
-turn_off_scientific_notation()
-
-# add graphviz to path for those who are blocked from updating it more directly
-if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
-    os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
-
-usr_dir = os.path.expanduser('~')
-run_time = dt.now().strftime('%Y_%m_%d_%H:%M:%S')
-run_dir = f'{usr_dir}/Documents/ml_taxi/runs/{run_time}/'
-inputs_dir = f'{usr_dir}/Documents/ml_taxi/'
-os.makedirs(run_dir, exist_ok=True)
-
-# input file paths
-train_path = f'{inputs_dir}train_w_boro.csv'
-kaggle_test_path = f'{inputs_dir}test.csv'
-# https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
-nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_15_07:39:56/history.csv'
-
-# output file paths
-log_dir = f'{run_dir}logs/'
-train_histogram_path = f'{run_dir}histogram_train.png'
-test_histogram_path = f'{run_dir}histogram_test.png'
-train_map_path = f'{run_dir}map_train.png'
-correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
-model_graph_path = f'{run_dir}model_graph.png'
-model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
-history_path = f'{run_dir}history.csv'
-tuning_dir = f'{usr_dir}/hyperparam_tuning/{run_time}/'
-
-# variables
-y_var = 'trip_duration'
-# x vars that will definitely be in the model, later vars get optionally added downstream
-x_vars = [
-    # 'd_boro_bronx', 'd_boro_brook', 'd_boro_man', 'd_boro_queens', 'd_boro_si',
-    # 'p_boro_bronx', 'p_boro_brook', 'p_boro_man', 'p_boro_queens', 'p_boro_si',
-    'const', 'passenger_count', 'store_and_fwd_flag', 'vendor_id',
-    'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
-    ]
-
-dtypes, dt_cols = taxi_shared.get_dtypes('train')
-train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols,
-                    nrows=10000  # todo remove when done demoing tuning
-                    )
-train = add_const(train)
-train = remove_0_passenger_count_trips(train)
-train = remove_outlier_long_duration_trips(train)
-train = drop_id_column(train)
-train = convert_categoricals_to_float(train)
-
-# train, x_vars = assign_distance(train, x_vars)
-# train = remove_outlier_long_distance_trips(train)
-train, x_vars = add_time_frequencies(train, x_vars, '1H')
-train, x_vars = add_weekends(train, x_vars)
-train = normalize(train)
-
-train = train[x_vars + [y_var]].copy()
-assert train.notnull().all().all()
-
-# write out some eda plots
-write_histogram(train, train_histogram_path)
-# write_pickup_dropoff_scatterplot_map(train, train_map_path)
-write_correlation_matrix_heatmap(train, correlation_heatmap_path)
-
-train_x, train_y, validation_x, validation_y, test_x, test_y = \
-    get_train_test_val_split(train, .1, .1, y_var)
-ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
-# print(ols_error, ols_rmsle)
-
-cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
-                  'layer_range': [1, 2],
-                  'node_range': [32, 64], # must be multiples of 32
-                  'learning_rate_choices': [.01, .1]
-                  },
-    'layers': [['relu', 256],
-               ['relu', 256],
-               ['relu', 128],
-               ['relu', 128],
-               ['relu', 128],
-               ['linear', 1]],
-    'epochs': 20,
-    'batch_size': 1000,
-    'learning_rate': .01,
-    'loss': 'mae',
-    'metrics': ['mean_squared_logarithmic_error'],
-    }
-cfg['x_vars'] = x_vars
-
-
-# todo add tuning for batch size
-#   - https://keras.io/guides/keras_tuner/getting_started/#tune-model-training
 class HyperparamTuningModelBuilder(kt.HyperModel):
+    '''
+    Model constructor that is passed to the hyperparameter tuning function
+    '''
     def __init__(self, layer_range, node_range, learning_rate_choices):
         self.layer_range = layer_range
         self.node_range = node_range
@@ -455,9 +355,111 @@ class HyperparamTuningModelBuilder(kt.HyperModel):
 
         return model
 
-# construct tuner object
+# todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
+# todo implement root mean squared logarithmic error as the error metric (for ols as well?)
+# todo add feature: rounded lat long dummies (should improve ols)
+# todo add feature: interactions (e.g. borough-time of day)
+# todo add feature: airport dummies
+# todo query google api to get distance between ~few hundred rounded lat long points,
+#  built dataset of road distances between these points
+# todo try automated hyperparameter tuning with keras tuner
+
+shared.use_cpu_and_make_results_reproducible()
+turn_off_scientific_notation()
+
+# add graphviz to path for those who are blocked from updating it more directly
+if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
+    os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
+
+# construct run_dir
+usr_dir = os.path.expanduser('~')
+run_time = dt.now().strftime('%Y_%m_%d_%H:%M:%S')
+run_dir = f'{usr_dir}/Documents/ml_taxi/runs/{run_time}/'
+os.makedirs(run_dir, exist_ok=True)
+
+# input file paths
+inputs_dir = f'{usr_dir}/Documents/ml_taxi/'
+train_path = f'{inputs_dir}train_w_boro.csv'
+kaggle_test_path = f'{inputs_dir}test.csv'
+# https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
+nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_15_07:39:56/history.csv'
+
+# output file paths
+model_fit_log_dir = f'{run_dir}logs/'
+tuning_dir = f'{run_dir}/hyperparam_tuning/{run_time}/'
+tuning_log_dir = f'{tuning_dir}logs/'
+train_histogram_path = f'{run_dir}histogram_train.png'
+test_histogram_path = f'{run_dir}histogram_test.png'
+train_map_path = f'{run_dir}map_train.png'
+correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
+model_graph_path = f'{run_dir}model_graph.png'
+model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
+history_path = f'{run_dir}history.csv'
+tuning_dir = f'{run_dir}/hyperparam_tuning/'
+
+# variables
+y_var = 'trip_duration'
+# x vars that will definitely be in the model, later vars get optionally added downstream
+x_vars = [
+    # 'd_boro_bronx', 'd_boro_brook', 'd_boro_man', 'd_boro_queens', 'd_boro_si',
+    # 'p_boro_bronx', 'p_boro_brook', 'p_boro_man', 'p_boro_queens', 'p_boro_si',
+    'const', 'passenger_count', 'store_and_fwd_flag', 'vendor_id',
+    'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
+    ]
+
+dtypes, dt_cols = taxi_shared.get_dtypes('train')
+train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols,
+                    nrows=10000  # todo remove when done testing
+                    )
+train = add_const(train)
+train = remove_0_passenger_count_trips(train)
+train = remove_outlier_long_duration_trips(train)
+train = drop_id_column(train)
+train = convert_categoricals_to_float(train)
+
+# train, x_vars = assign_distance(train, x_vars)
+# train = remove_outlier_long_distance_trips(train)
+train, x_vars = add_time_frequencies(train, x_vars, '1H')
+train, x_vars = add_weekends(train, x_vars)
+train = normalize(train)
+
+train = train[x_vars + [y_var]].copy()
+assert train.notnull().all().all()
+
+train_x, train_y, validation_x, validation_y, test_x, test_y = \
+    get_train_test_val_split(train, .1, .1, y_var)
+ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
+# print(ols_error, ols_rmsle)
+
+cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
+                  'layer_range': [1, 2],
+                  'node_range': [32, 64], # must be multiples of 32
+                  'learning_rate_choices': [.01, .1]
+                  },
+       'layers': [['relu', 256],
+                  ['relu', 256],
+                  ['relu', 128],
+                  ['relu', 128],
+                  ['relu', 128],
+                  ['linear', 1]],
+       'epochs': 20,
+       'batch_size': 1000,
+       'learning_rate': .01,
+       'loss': 'mae',
+       'metrics': ['mean_squared_logarithmic_error'],
+       }
+cfg['x_vars'] = x_vars
+
+
+# todo add tuning for batch size
+#   - https://keras.io/guides/keras_tuner/getting_started/#tune-model-training
+
+
+# hyperparam tuning run that discovers best hyperparameters
 if cfg['tuning']['tune?']:
     cfg_t = cfg['tuning']
+
     tuning_model_builder = \
         HyperparamTuningModelBuilder(layer_range=cfg_t['layer_range'],
                                      node_range=cfg_t['node_range'],
@@ -466,23 +468,20 @@ if cfg['tuning']['tune?']:
                          objective='mean_squared_logarithmic_error',
                          max_epochs=10,
                          directory=tuning_dir,
-                         # project_name='tune'
-                         )
-    # add early stopping if the metric doesn't improve after <patience> epochs
-    stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+                         project_name='checkpoints_and_results')
 
     # iterate through the hyperparam options, discovering the best ones
     tuner.search(train_x, train_y, epochs=10, shuffle=False,
-                 validation_data=(validation_x, validation_y), callbacks=[stop_early])
+                 validation_data=(validation_x, validation_y),
+                 callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=5),
+                            keras.callbacks.TensorBoard(tuning_log_dir)])
 
-    # summary of the space of hyperparameters being evaluated (e.g. layer size range, learning rate range)
-    print(tuner.search_space_summary())
-
-    # extract best hyperparams from the search
-    #   (num trials is how many of the best hyperparam sets to return)
+    # extract best hyperparams from the search (num trials is how many
+    # of the best hyperparam sets to return)
     best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
-    print(best_hps.values)
     model = tuner.hypermodel.build(best_hps)
+
+# non-tuning run that takes params from cfg
 else:
     model = keras.Sequential()
     for activation, size in cfg['layers']:
@@ -492,21 +491,20 @@ else:
                   loss=cfg['loss'],
                   metrics=cfg['metrics'])
 
+# train model
 history = model.fit(train_x,
                     train_y,
                     shuffle=False,
                     epochs=cfg['epochs'],
                     batch_size=cfg['batch_size'],
                     validation_data=(validation_x, validation_y),
-                    callbacks=[
-                               # keras.callbacks.CSVLogger('path_to_log_file.txt'),
-                               keras.callbacks.TensorBoard(log_dir),
-                               # hpa.KerasCallback(log_dir, hparams),  # log hparams
-                               ],
-                    verbose=0
+                    callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
                     )
 
-# miscellaneous writes
+# # miscellaneous writes
+write_histogram(train, train_histogram_path)
+# write_pickup_dropoff_scatterplot_map(train, train_map_path)
+write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 write_history_df(history, history_path)
 shared.write_model_graph(model, model_graph_path)
 
@@ -530,3 +528,12 @@ with open(model_accuracy_report_path, 'a') as report:
     report.close()
     print('done writing report')
 webbrowser.open(model_accuracy_report_path)
+
+tb1 = program.TensorBoard()
+tb1.configure(argv=[None, '--logdir', model_fit_log_dir])
+url1 = tb1.launch()
+print(f"Model fit dashboard available on {url1}")
+tb2 = program.TensorBoard()
+tb2.configure(argv=[None, '--logdir', tuning_log_dir])
+url2 = tb2.launch()
+print(f"Hyperparameter tuning dashboard available on {url2}")
