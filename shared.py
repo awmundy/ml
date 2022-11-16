@@ -115,8 +115,7 @@ def write_model_graph(model, out_path):
     keras.utils.plot_model(model,
                            to_file=out_path,
                            show_shapes=True,
-                           show_dtype=True,
-                           show_layer_activations=True)
+                           show_dtype=True)
 
 def use_cpu_and_make_results_reproducible():
     # Makes GPU invisible to tensorflow

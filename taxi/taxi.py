@@ -10,9 +10,15 @@ import seaborn as sn
 from statsmodels.stats.outliers_influence import variance_inflation_factor as get_vif
 import geopandas as gpd
 from matplotlib.lines import Line2D
+import matplotlib
+matplotlib.use("Qt5Agg")
 from sys import platform
 from datetime import datetime as dt
 import webbrowser
+
+pd.set_option('display.max_rows', 50)
+pd.set_option('display.max_columns', 500)
+#pd.set_option('display.width', 1000)
 
 if platform in ('darwin', 'win32'):
     import shared as shared
@@ -140,14 +146,17 @@ def get_ols_error(train_x, train_y, test_x, test_y):
 
     model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
     res = model.fit()
-    # print(res.summary2())
+    print(res.summary2())
     ols_pred = res.predict(test_x)
 
     # construct mean absolute error
-    ols_error = (ols_pred - test_y).abs().sum() / len(ols_pred)
-    ols_error = round(ols_error)
+    ols_mae = (ols_pred - test_y).abs().sum() / len(ols_pred)
+    ols_mae = round(ols_mae)
 
-    return ols_error
+    # root mean squared logarithmic error
+    ols_rmsle = (np.sum((np.log(ols_pred + 1) - np.log(test_y))**2)/len(ols_pred))**0.5
+
+    return ols_mae, ols_rmsle
 
 def prep_kaggle_test_data(kaggle_test_path):
     dtypes, dt_cols = taxi_shared.get_dtypes('kaggle_test')
@@ -296,6 +305,19 @@ def normalize(df):
 
     return df
 
+def add_const(df):
+    df.insert(0, 'const', 1)
+    return df
+
+def copy_lat_long(df):
+    df.insert(0, 'drop_long_raw', df['dropoff_longitude'])
+    df.insert(0, 'drop_lat_raw', df['dropoff_latitude'])
+    df.insert(0, 'pick_long_raw', df['pickup_longitude'])
+    df.insert(0, 'pick_lat_raw', df['pickup_latitude'])
+    return df
+
+
+
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
 # todo add feature: rounded lat long dummies (should improve ols)
@@ -340,52 +362,61 @@ y_var = 'trip_duration'
 x_vars = [
     # 'd_boro_bronx', 'd_boro_brook', 'd_boro_man', 'd_boro_queens', 'd_boro_si',
     # 'p_boro_bronx', 'p_boro_brook', 'p_boro_man', 'p_boro_queens', 'p_boro_si',
-    'passenger_count', 'store_and_fwd_flag', 'vendor_id',
+    'const', 'passenger_count', 'store_and_fwd_flag', 'vendor_id',
     'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
-
     ]
+#x_vars = ['const']
 
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
+#train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols, nrows=100000)
+print(len(train))
+
+
+train = add_const(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_duration_trips(train)
 train = drop_id_column(train)
 train = convert_categoricals_to_float(train)
 
-# train, x_vars = assign_distance(train, x_vars)
+train, x_vars = assign_distance(train, x_vars)
 # train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
+
+
 train = normalize(train)
 
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
 
 # write out some eda plots
-write_histogram(train, train_histogram_path)
+# write_histogram(train, train_histogram_path)
 # write_pickup_dropoff_scatterplot_map(train, train_map_path)
-write_correlation_matrix_heatmap(train, correlation_heatmap_path)
+# write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 
 train_x, train_y, validation_x, validation_y, test_x, test_y = \
     get_train_test_val_split(train, .1, .1, y_var)
-ols_error = get_ols_error(train_x, train_y, test_x, test_y)
+ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
+print(ols_error, ols_rmsle)
 
-cfg = {'layers': [['relu', 256],
-                  ['relu', 256],
-                  ['relu', 256],
-                  ['relu', 256],
-                  # ['relu', 128],
-                  # ['relu', 128],
-                  # ['relu', 128],
+
+cfg = {'layers': [['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
+                  ['relu', 64],
                   ['linear', 1]],
-       'epochs': 50,
+       'epochs': 150,
        'batch_size': 10000,
        'learning_rate': .01,
        'loss': 'mae',
        'metrics': ['mean_squared_logarithmic_error'],
        }
 cfg['x_vars'] = x_vars
+
 
 model = keras.Sequential()
 for activation, size in cfg['layers']:
