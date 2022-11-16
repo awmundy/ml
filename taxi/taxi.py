@@ -18,6 +18,7 @@ from sys import platform
 from datetime import datetime as dt
 import webbrowser
 import keras_tuner as kt
+from tensorboard.plugins.hparams import api as hpa
 
 pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 500)
@@ -349,6 +350,7 @@ nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d
 run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_15_07:39:56/history.csv'
 
 # output file paths
+log_dir = f'{run_dir}logs/'
 train_histogram_path = f'{run_dir}histogram_train.png'
 test_histogram_path = f'{run_dir}histogram_test.png'
 train_map_path = f'{run_dir}map_train.png'
@@ -397,7 +399,11 @@ train_x, train_y, validation_x, validation_y, test_x, test_y = \
 ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
 # print(ols_error, ols_rmsle)
 
-cfg = {
+cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
+                  'layer_range': [1, 2],
+                  'node_range': [32, 64], # must be multiples of 32
+                  'learning_rate_choices': [.01, .1]
+                  },
     'layers': [['relu', 256],
                ['relu', 256],
                ['relu', 128],
@@ -415,71 +421,89 @@ cfg['x_vars'] = x_vars
 
 # todo add tuning for batch size
 #   - https://keras.io/guides/keras_tuner/getting_started/#tune-model-training
-def model_builder(hp):
-    '''
-    hp: kt.engine.hyperparameters.HyperParameters object
-    '''
-    model = keras.Sequential()
+class HyperparamTuningModelBuilder(kt.HyperModel):
+    def __init__(self, layer_range, node_range, learning_rate_choices):
+        self.layer_range = layer_range
+        self.node_range = node_range
+        self.learning_rate_choices = learning_rate_choices
 
-    # tune number of layers
-    for i in range(hp.Int('num_of_layers', 1, 2)):
-        # tune layer size
-        model.add(keras.layers.Dense(units=hp.Int('#_nodes_l' + str(i),
-                                                  min_value=32,
-                                                  max_value=64,
-                                                  step=32),
-                                     activation='relu'))
+    # this must be called build or keras won't recognize it
+    def build(self, hp):
+        '''
+        hp: kt.engine.hyperparameters.HyperParameters object
+        '''
+        model = keras.Sequential()
 
-    model.add(keras.layers.Dense(1, activation='linear'))
+        # tune number of layers
+        for i in range(hp.Int('num_of_layers', self.layer_range[0], self.layer_range[1])):
+            # tune layer size
+            model.add(keras.layers.Dense(units=hp.Int('#_nodes_l' + str(i),
+                                                      min_value=self.node_range[0],
+                                                      max_value=self.node_range[1],
+                                                      step=32),
+                                         activation='relu'))
 
-    # tune learning rate
-    hp_learning_rate = hp.Choice('learning_rate', values=[.01, .001])
+        model.add(keras.layers.Dense(1, activation='linear'))
 
-    model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
-                  loss='mae',
-                  metrics=['mean_squared_logarithmic_error'])
+        # tune learning rate
+        hp_learning_rate = hp.Choice('learning_rate', values=[self.learning_rate_choices[0],
+                                                              self.learning_rate_choices[1]])
 
-    return model
+        model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
+                      loss='mae',
+                      metrics=['mean_squared_logarithmic_error'])
 
+        return model
 
 # construct tuner object
-tuner = kt.Hyperband(model_builder,
-                     objective='mean_squared_logarithmic_error',
-                     max_epochs=10,
-                     directory=tuning_dir,
-                     project_name='intro_to_kt')
-# add early stopping if the metric doesn't improve after <patience> epochs
-stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+if cfg['tuning']['tune?']:
+    cfg_t = cfg['tuning']
+    tuning_model_builder = \
+        HyperparamTuningModelBuilder(layer_range=cfg_t['layer_range'],
+                                     node_range=cfg_t['node_range'],
+                                     learning_rate_choices=cfg_t['learning_rate_choices'])
+    tuner = kt.Hyperband(tuning_model_builder,
+                         objective='mean_squared_logarithmic_error',
+                         max_epochs=10,
+                         directory=tuning_dir,
+                         # project_name='tune'
+                         )
+    # add early stopping if the metric doesn't improve after <patience> epochs
+    stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
-# iterate through the hyperparam options, discovering the best ones
-tuner.search(train_x, train_y, epochs=10, shuffle=False,
-             validation_data=(validation_x, validation_y), callbacks=[stop_early])
+    # iterate through the hyperparam options, discovering the best ones
+    tuner.search(train_x, train_y, epochs=10, shuffle=False,
+                 validation_data=(validation_x, validation_y), callbacks=[stop_early])
 
-# summary of the space of hyperparameters being evaluated (e.g. layer size range, learning rate range)
-print(tuner.search_space_summary())
+    # summary of the space of hyperparameters being evaluated (e.g. layer size range, learning rate range)
+    print(tuner.search_space_summary())
 
-# extract best hyperparams from the search
-#   (num trials is how many of the best hyperparam sets to return)
-best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
-print(best_hps.values)
-model = tuner.hypermodel.build(best_hps)
+    # extract best hyperparams from the search
+    #   (num trials is how many of the best hyperparam sets to return)
+    best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+    print(best_hps.values)
+    model = tuner.hypermodel.build(best_hps)
+else:
+    model = keras.Sequential()
+    for activation, size in cfg['layers']:
+        model.add(layers.Dense(size, activation=activation))
 
-# model = keras.Sequential()
-# for activation, size in cfg['layers']:
-#     model.add(layers.Dense(size, activation=activation))
-#
-# model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
-#               loss=cfg['loss'],
-#               metrics=cfg['metrics'])
+    model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
+                  loss=cfg['loss'],
+                  metrics=cfg['metrics'])
 
 history = model.fit(train_x,
                     train_y,
                     shuffle=False,
                     epochs=cfg['epochs'],
                     batch_size=cfg['batch_size'],
-                    validation_data=(validation_x, validation_y)
-                    # callbacks=keras.callbacks.CSVLogger('path_to_log_file.txt',
-                    # verbose=0
+                    validation_data=(validation_x, validation_y),
+                    callbacks=[
+                               # keras.callbacks.CSVLogger('path_to_log_file.txt'),
+                               keras.callbacks.TensorBoard(log_dir),
+                               # hpa.KerasCallback(log_dir, hparams),  # log hparams
+                               ],
+                    verbose=0
                     )
 
 # miscellaneous writes
