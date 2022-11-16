@@ -49,23 +49,19 @@ def build_training_plot_html(history, plot_type, benchmark=None):
     # fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95,
     #                     hspace=0.1, wspace=0.1)
 
-    # instantiate figure
-    fig = plt.figure(figsize=(5,5))
-
+    fig, ax = plt.subplots()
+    fig.set_size_inches(5,5)
+    if benchmark:
+        ax.hlines(y=benchmark, xmin=0, xmax=20, color='r', label='benchmark')
     # make y axis a percent when relevant
     if plot_type == 'accuracy':
-        ax = fig.add_subplot(1,1,1)
         ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1.0))
-
-    # plot
-    if benchmark:
-        plt.axhline(y=benchmark, color='r', linestyle='-', label='benchmark'),
-    plt.plot(df['epoch'], df[y_col_1], "bo", label=y_col_1_label)
-    plt.plot(df['epoch'], df[y_col_2], "b", label=y_col_2_label)
-    plt.title(title, fontdict={'fontsize': 16, 'fontweight': 'bold'})
-    plt.xlabel("Epochs")
-    plt.ylabel(plot_type)
-    plt.legend()
+    ax.plot(df['epoch'], df[y_col_1], "bo", label=y_col_1_label)
+    ax.plot(df['epoch'], df[y_col_2], "b", label=y_col_2_label)
+    ax.set_title(title, fontdict={'fontsize': 16, 'fontweight': 'bold'})
+    ax.set_xlabel("Epochs")
+    ax.set_ylabel(plot_type)
+    ax.legend()
     plt.show()
 
     html = mpld3.fig_to_html(fig)
