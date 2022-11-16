@@ -1,5 +1,4 @@
 import os
-
 # turn off tensorflow info messages about e.g. cpu optimization features
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 from tensorflow.keras import layers
@@ -14,7 +13,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor as ge
 import geopandas as gpd
 from matplotlib.lines import Line2D
 import matplotlib
-matplotlib.use("Qt5Agg")
+# matplotlib.use("Qt5Agg") # backend that a dev requires for plot to work
 from sys import platform
 from datetime import datetime as dt
 import webbrowser
@@ -373,6 +372,7 @@ dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols,
                     nrows=10000  # todo remove when done demoing tuning
                     )
+train = add_const(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_duration_trips(train)
 train = drop_id_column(train)
