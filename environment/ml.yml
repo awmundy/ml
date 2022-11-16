@@ -3,23 +3,23 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - fastparquet
-  - geopandas
   - h5py
   - jupyter
-  - keras
+  - tensorflow
   - matplotlib
   - mpld3
   - numpy
   - pandas
   - pip
   - plotly
-  - python
   - pydot
   - scikit-learn
   - scipy
   - pip:
       - lightgbm
       - xgboost
+      - geopandas
+      - statsmodels
+      - seaborn
 prefix: ~/miniconda3/envs/ml
 
