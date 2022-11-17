@@ -318,14 +318,15 @@ def copy_lat_long(df):
     df.insert(0, 'pick_lat_raw', df['pickup_latitude'])
     return df
 
-class HyperparamTuningModelBuilder(kt.HyperModel):
+class CustomHyperModel(kt.HyperModel):
     '''
     Model constructor that is passed to the hyperparameter tuning function
     '''
-    def __init__(self, layer_range, node_range, learning_rate_choices):
+    def __init__(self, layer_range, node_range, learning_rate_choices, batch_size_choices):
         self.layer_range = layer_range
         self.node_range = node_range
         self.learning_rate_choices = learning_rate_choices
+        self.batch_size_choices = batch_size_choices
 
     # this must be called build or keras won't recognize it
     def build(self, hp):
@@ -352,18 +353,37 @@ class HyperparamTuningModelBuilder(kt.HyperModel):
         model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
                       loss='mae',
                       metrics=['mean_squared_logarithmic_error'])
-
         return model
 
+    # must be called fit for keras to recognize it, *args/**kwargs are
+    # passed in from tuner.search()
+    def fit(self, hp, model, *args, **kwargs):
+        return model.fit(
+                *args,
+                batch_size=hp.Choice("batch_size", [self.batch_size_choices[0],
+                                                    self.batch_size_choices[1]]),
+                **kwargs)
+
+
+
 def launch_tensorboards(model_fit_log_dir, tuning_log_dir):
+    '''
+    Launches a tensorboard dashboard for the model fit.
+    Also launches a dashboard for hyperparameter tuning if that was done.
+    Tensorboard can be launched from the command line directly with:
+        tensorboard --logdir='path_to_logs' --port=inert_port_num_here
+        (port optional but default port may be already used)
+    '''
+
     tb_model = program.TensorBoard()
     tb_model.configure(argv=[None, '--logdir', model_fit_log_dir])
     url_model = tb_model.launch()
     print(f"Model fit dashboard available on {url_model}")
-    tb_tune = program.TensorBoard()
-    tb_tune.configure(argv=[None, '--logdir', tuning_log_dir])
-    url_tune = tb_tune.launch()
-    print(f"Hyperparameter tuning dashboard available on {url_tune}")
+    if os.path.exists(tuning_log_dir):
+        tb_tune = program.TensorBoard()
+        tb_tune.configure(argv=[None, '--logdir', tuning_log_dir])
+        url_tune = tb_tune.launch()
+        print(f"Hyperparameter tuning dashboard available on {url_tune}")
 
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
@@ -393,11 +413,11 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_15_07:39:56/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_17_08:22:28/history.csv'
 
 # output file paths
 model_fit_log_dir = f'{run_dir}logs/'
-tuning_dir = f'{run_dir}/hyperparam_tuning/{run_time}/'
+tuning_dir = f'{run_dir}/hyperparam_tuning/'
 tuning_log_dir = f'{tuning_dir}logs/'
 train_histogram_path = f'{run_dir}histogram_train.png'
 test_histogram_path = f'{run_dir}histogram_test.png'
@@ -445,7 +465,8 @@ ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
 cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
                   'layer_range': [1, 2],
                   'node_range': [32, 64], # must be multiples of 32
-                  'learning_rate_choices': [.01, .1]
+                  'learning_rate_choices': [.01, .1],
+                  'batch_size_choices': [1000, 10000]
                   },
        'layers': [['relu', 256],
                   ['relu', 256],
@@ -462,18 +483,15 @@ cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding par
 cfg['x_vars'] = x_vars
 
 
-# todo add tuning for batch size
-#   - https://keras.io/guides/keras_tuner/getting_started/#tune-model-training
-
-
 # hyperparam tuning run that discovers best hyperparameters
 if cfg['tuning']['tune?']:
     cfg_t = cfg['tuning']
 
     tuning_model_builder = \
-        HyperparamTuningModelBuilder(layer_range=cfg_t['layer_range'],
-                                     node_range=cfg_t['node_range'],
-                                     learning_rate_choices=cfg_t['learning_rate_choices'])
+        CustomHyperModel(layer_range=cfg_t['layer_range'],
+                         node_range=cfg_t['node_range'],
+                         learning_rate_choices=cfg_t['learning_rate_choices'],
+                         batch_size_choices=cfg_t['batch_size_choices'])
     tuner = kt.Hyperband(tuning_model_builder,
                          objective='mean_squared_logarithmic_error',
                          max_epochs=10,
@@ -489,6 +507,9 @@ if cfg['tuning']['tune?']:
     # extract best hyperparams from the search (num trials is how many
     # of the best hyperparam sets to return)
     best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+    print(f'Building model with the following tuned values:')
+    for k, v in best_hps.values.items():
+        print(f'{k}: {v}')
     model = tuner.hypermodel.build(best_hps)
 
 # non-tuning run that takes params from cfg
