@@ -320,13 +320,15 @@ def copy_lat_long(df):
 
 class CustomHyperModel(kt.HyperModel):
     '''
-    Model constructor that is passed to the hyperparameter tuning function
+    Class that is passed to the hyperparameter tuning function
     '''
-    def __init__(self, layer_range, node_range, learning_rate_choices, batch_size_choices):
+    def __init__(self, layer_range, node_range, learning_rate_choices,
+                 batch_size_choices, metrics):
         self.layer_range = layer_range
         self.node_range = node_range
         self.learning_rate_choices = learning_rate_choices
         self.batch_size_choices = batch_size_choices
+        self.metrics = metrics
 
     # this must be called build or keras won't recognize it
     def build(self, hp):
@@ -352,7 +354,7 @@ class CustomHyperModel(kt.HyperModel):
 
         model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
                       loss='mae',
-                      metrics=['mean_squared_logarithmic_error'])
+                      metrics=self.metrics)
         return model
 
     # must be called fit for keras to recognize it, *args/**kwargs are
@@ -363,8 +365,6 @@ class CustomHyperModel(kt.HyperModel):
                 batch_size=hp.Choice("batch_size", [self.batch_size_choices[0],
                                                     self.batch_size_choices[1]]),
                 **kwargs)
-
-
 
 def launch_tensorboards(model_fit_log_dir, tuning_log_dir):
     '''
@@ -384,6 +384,21 @@ def launch_tensorboards(model_fit_log_dir, tuning_log_dir):
         tb_tune.configure(argv=[None, '--logdir', tuning_log_dir])
         url_tune = tb_tune.launch()
         print(f"Hyperparameter tuning dashboard available on {url_tune}")
+
+def root_mean_squared_logarithmic_error(y_true, y_pred):
+    '''
+    Uses tensorflow math functions to return the root mean squared log error as a tensor
+    '''
+    # used to avoid log(0) issues
+    epsilon = tf.constant(0.00001)
+
+    log_error = tf.math.log(y_true + epsilon) - tf.math.log(y_pred + epsilon)
+    sq_log_error = tf.pow(log_error, 2)
+    mean_sq_log_error = tf.reduce_mean(sq_log_error)
+    root_mean_sq_log_error = tf.math.sqrt(mean_sq_log_error)
+
+    return root_mean_sq_log_error
+
 
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
@@ -438,6 +453,25 @@ x_vars = [
     'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
     ]
 
+cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
+                  'layer_range': [1, 2],
+                  'node_range': [32, 64], # must be multiples of 32
+                  'learning_rate_choices': [.01, .1],
+                  'batch_size_choices': [1000, 10000]
+                  },
+       'layers': [['relu', 256],
+                  ['relu', 256],
+                  ['relu', 128],
+                  ['relu', 128],
+                  ['relu', 128],
+                  ['linear', 1]],
+       'epochs': 20,
+       'batch_size': 1000,
+       'learning_rate': .01,
+       'loss': 'mae',
+       'metrics': [root_mean_squared_logarithmic_error],
+       }
+
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
 train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols,
                     nrows=10000  # todo remove when done testing
@@ -462,38 +496,25 @@ train_x, train_y, validation_x, validation_y, test_x, test_y = \
 ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
 # print(ols_error, ols_rmsle)
 
-cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
-                  'layer_range': [1, 2],
-                  'node_range': [32, 64], # must be multiples of 32
-                  'learning_rate_choices': [.01, .1],
-                  'batch_size_choices': [1000, 10000]
-                  },
-       'layers': [['relu', 256],
-                  ['relu', 256],
-                  ['relu', 128],
-                  ['relu', 128],
-                  ['relu', 128],
-                  ['linear', 1]],
-       'epochs': 20,
-       'batch_size': 1000,
-       'learning_rate': .01,
-       'loss': 'mae',
-       'metrics': ['mean_squared_logarithmic_error'],
-       }
 cfg['x_vars'] = x_vars
-
 
 # hyperparam tuning run that discovers best hyperparameters
 if cfg['tuning']['tune?']:
     cfg_t = cfg['tuning']
 
+    # build the hypermodel with hyperparam specified in the config
     tuning_model_builder = \
         CustomHyperModel(layer_range=cfg_t['layer_range'],
                          node_range=cfg_t['node_range'],
                          learning_rate_choices=cfg_t['learning_rate_choices'],
-                         batch_size_choices=cfg_t['batch_size_choices'])
+                         batch_size_choices=cfg_t['batch_size_choices'],
+                         metrics=cfg['metrics'])
+
+
+    # build a tuner object that will be used to search the hyperparameter space
     tuner = kt.Hyperband(tuning_model_builder,
-                         objective='mean_squared_logarithmic_error',
+                         # requires the string name of the function
+                         objective=kt.Objective('root_mean_squared_logarithmic_error', 'min'),
                          max_epochs=10,
                          directory=tuning_dir,
                          project_name='checkpoints_and_results')

@@ -9,6 +9,7 @@ from random import seed as python_seed
 import os
 import tensorflow as tf
 import pprint
+import types
 
 
 def get_history_df(history, pretty_cols=False):
@@ -34,6 +35,10 @@ def read_image_as_html(image_path, image_title=None):
 
 def build_training_plot_html(history, plot_type, benchmark=None):
     df = get_history_df(history)
+
+    # if the metric was a function rather than a string, extract the string name
+    if isinstance(plot_type, types.FunctionType):
+        plot_type = plot_type.__name__
 
     if plot_type not in df:
         raise Exception(f'{plot_type} not a valid metric in the model history')
