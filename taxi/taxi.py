@@ -512,7 +512,6 @@ if cfg['tuning']['tune?']:
                          loss_choices=cfg_t['loss_choices'],
                          metrics=cfg['metrics'])
 
-
     # build a tuner object that will be used to search the hyperparameter space
     tuner = kt.Hyperband(tuning_model_builder,
                          # requires the string name of the function
@@ -534,7 +533,17 @@ if cfg['tuning']['tune?']:
     for k, v in best_hps.values.items():
         print(f'{k}: {v}')
     model = tuner.hypermodel.build(best_hps)
+    best_batch_size = best_hps.values['batch_size']
 
+    # train model
+    history = model.fit(train_x,
+                        train_y,
+                        shuffle=False,
+                        epochs=cfg['epochs'],
+                        batch_size=best_batch_size,
+                        validation_data=(validation_x, validation_y),
+                        callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
+                        )
 # non-tuning run that takes params from cfg
 else:
     model = keras.Sequential()
@@ -545,15 +554,15 @@ else:
                   loss=cfg['loss'],
                   metrics=cfg['metrics'])
 
-# train model
-history = model.fit(train_x,
-                    train_y,
-                    shuffle=False,
-                    epochs=cfg['epochs'],
-                    batch_size=cfg['batch_size'],
-                    validation_data=(validation_x, validation_y),
-                    callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
-                    )
+    # train model
+    history = model.fit(train_x,
+                        train_y,
+                        shuffle=False,
+                        epochs=cfg['epochs'],
+                        batch_size=cfg['batch_size'],
+                        validation_data=(validation_x, validation_y),
+                        callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
+                        )
 
 # # miscellaneous writes
 write_histogram(train, train_histogram_path)
