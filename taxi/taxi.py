@@ -355,6 +355,16 @@ class HyperparamTuningModelBuilder(kt.HyperModel):
 
         return model
 
+def launch_tensorboards(model_fit_log_dir, tuning_log_dir):
+    tb_model = program.TensorBoard()
+    tb_model.configure(argv=[None, '--logdir', model_fit_log_dir])
+    url_model = tb_model.launch()
+    print(f"Model fit dashboard available on {url_model}")
+    tb_tune = program.TensorBoard()
+    tb_tune.configure(argv=[None, '--logdir', tuning_log_dir])
+    url_tune = tb_tune.launch()
+    print(f"Hyperparameter tuning dashboard available on {url_tune}")
+
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # todo implement root mean squared logarithmic error as the error metric (for ols as well?)
 # todo add feature: rounded lat long dummies (should improve ols)
@@ -528,12 +538,4 @@ with open(model_accuracy_report_path, 'a') as report:
     report.close()
     print('done writing report')
 webbrowser.open(model_accuracy_report_path)
-
-tb1 = program.TensorBoard()
-tb1.configure(argv=[None, '--logdir', model_fit_log_dir])
-url1 = tb1.launch()
-print(f"Model fit dashboard available on {url1}")
-tb2 = program.TensorBoard()
-tb2.configure(argv=[None, '--logdir', tuning_log_dir])
-url2 = tb2.launch()
-print(f"Hyperparameter tuning dashboard available on {url2}")
+launch_tensorboards(model_fit_log_dir, tuning_log_dir)
