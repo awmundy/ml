@@ -323,11 +323,12 @@ class CustomHyperModel(kt.HyperModel):
     Class that is passed to the hyperparameter tuning function
     '''
     def __init__(self, layer_range, node_range, learning_rate_choices,
-                 batch_size_choices, metrics):
+                 batch_size_choices, loss_choices, metrics):
         self.layer_range = layer_range
         self.node_range = node_range
         self.learning_rate_choices = learning_rate_choices
         self.batch_size_choices = batch_size_choices
+        self.loss_choices = loss_choices
         self.metrics = metrics
 
     # this must be called build or keras won't recognize it
@@ -348,12 +349,13 @@ class CustomHyperModel(kt.HyperModel):
 
         model.add(keras.layers.Dense(1, activation='linear'))
 
-        # tune learning rate
+
         hp_learning_rate = hp.Choice('learning_rate', values=[self.learning_rate_choices[0],
                                                               self.learning_rate_choices[1]])
-
+        hp_loss = hp.Choice('loss_choices', values=[self.loss_choices[0],
+                                                    self.loss_choices[1]])
         model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
-                      loss='mae',
+                      loss=hp_loss,
                       metrics=self.metrics)
         return model
 
@@ -401,13 +403,11 @@ def root_mean_squared_logarithmic_error(y_true, y_pred):
 
 
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
-# todo implement root mean squared logarithmic error as the error metric (for ols as well?)
 # todo add feature: rounded lat long dummies (should improve ols)
 # todo add feature: interactions (e.g. borough-time of day)
 # todo add feature: airport dummies
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
-# todo try automated hyperparameter tuning with keras tuner
 
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
@@ -428,7 +428,7 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_17_08:22:28/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_17_11:40:12/history.csv'
 
 # output file paths
 model_fit_log_dir = f'{run_dir}logs/'
@@ -457,7 +457,8 @@ cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding par
                   'layer_range': [1, 2],
                   'node_range': [32, 64], # must be multiples of 32
                   'learning_rate_choices': [.01, .1],
-                  'batch_size_choices': [1000, 10000]
+                  'batch_size_choices': [1000, 10000],
+                  'loss_choices': ['mae', 'mse']
                   },
        'layers': [['relu', 256],
                   ['relu', 256],
@@ -508,6 +509,7 @@ if cfg['tuning']['tune?']:
                          node_range=cfg_t['node_range'],
                          learning_rate_choices=cfg_t['learning_rate_choices'],
                          batch_size_choices=cfg_t['batch_size_choices'],
+                         loss_choices=cfg_t['loss_choices'],
                          metrics=cfg['metrics'])
 
 
