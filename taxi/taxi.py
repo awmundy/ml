@@ -576,6 +576,7 @@ html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
 html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
 html_loss = shared.build_training_plot_html(history, 'loss', ols_error)
 html_cfg = shared.convert_dict_to_html(cfg)
+# todo only compare when it's the same loss function
 html_val_loss_improvement = \
     build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path)
 
