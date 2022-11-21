@@ -254,6 +254,19 @@ def add_weekends(df, x_vars):
 
     return df, x_vars
 
+
+def date_time_normalization(df, x_vars):
+    day = 24 * 60 * 60
+    week = day * 7
+    df['pickup_datetime'] = df['pickup_datetime'].map(pd.Timestamp.timestamp)
+    df['pickup_time_of_day_sin'] = np.sin(df['pickup_datetime'] * (2 * np.pi / day))
+    df['pickup_time_of_day_cos'] = np.sin(df['pickup_datetime'] * (2 * np.pi / day))
+    df['pickup_day_of_week_sin'] = np.sin(df['pickup_datetime'] * (2 * np.pi / week))
+    df['pickup_day_of_week_cos'] = np.cos(df['pickup_datetime'] * (2 * np.pi / week))
+    x_vars = x_vars + ['pickup_time_of_day_sin', 'pickup_time_of_day_cos', 'pickup_day_of_week_sin', 'pickup_day_of_week_cos']
+    return df, x_vars
+
+
 def remove_outlier_long_distance_trips(df):
     outlier_distance = 30
     msk = df['distance'] > outlier_distance
@@ -485,8 +498,9 @@ train = convert_categoricals_to_float(train)
 
 # train, x_vars = assign_distance(train, x_vars)
 # train = remove_outlier_long_distance_trips(train)
-train, x_vars = add_time_frequencies(train, x_vars, '1H')
-train, x_vars = add_weekends(train, x_vars)
+# train, x_vars = add_time_frequencies(train, x_vars, '1H')
+# train, x_vars = add_weekends(train, x_vars)
+train, x_vars = date_time_normalization(train, x_vars)
 train = normalize(train)
 
 train = train[x_vars + [y_var]].copy()
