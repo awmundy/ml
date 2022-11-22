@@ -521,6 +521,7 @@ train = convert_categoricals_to_float(train)
 # train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
+# todo normalize train/val/test separately
 train = normalize(train)
 
 train = train[x_vars + [y_var]].copy()
