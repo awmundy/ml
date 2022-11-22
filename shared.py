@@ -131,9 +131,9 @@ def use_cpu_and_make_results_reproducible():
     np_seed(1)
     tf.random.set_seed(2)
 
-def convert_dict_to_html(cfg):
+def convert_dict_to_html(_dict):
     html_lines = []
-    for line in pprint.pformat(cfg, sort_dicts=False).splitlines():
+    for line in pprint.pformat(_dict, sort_dicts=False).splitlines():
         html_lines.append(f'<br/>{line}')
     html = '\n'.join(html_lines)
 

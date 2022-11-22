@@ -364,8 +364,8 @@ class CustomHyperModel(kt.HyperModel):
     def fit(self, hp, model, *args, **kwargs):
         return model.fit(
                 *args,
-                batch_size=hp.Choice("batch_size", [self.batch_size_choices[0],
-                                                    self.batch_size_choices[1]]),
+                batch_size=hp.Choice("batch_size", values=[self.batch_size_choices[0],
+                                                           self.batch_size_choices[1]]),
                 **kwargs)
 
 def launch_tensorboards(model_fit_log_dir, tuning_log_dir):
@@ -401,6 +401,40 @@ def root_mean_squared_logarithmic_error(y_true, y_pred):
 
     return root_mean_sq_log_error
 
+def build_hyperparam_html(best_hps_dict):
+    if best_hps_dict:
+        html_best_hps_dict = shared.convert_dict_to_html(best_hps_dict)
+        header_label = 'Best Hyperparameters from Tuning'
+    else:
+        html_best_hps_dict = ''
+        header_label = 'No Hyperparameter Tuning Performed'
+    html_best_hp = \
+        f"""
+        <html>
+          <head>
+          </head>
+          <body>
+            <h2>{header_label}</h2>
+            {html_best_hps_dict}
+          </body>
+        </html>
+        """
+    return html_best_hp
+
+def build_cfg_html(cfg):
+    html_cfg_dict = shared.convert_dict_to_html(cfg)
+    html_cfg = \
+        f"""
+        <html>
+          <head>
+          </head>
+          <body>
+            <h2>Run Parameters from cfg</h2>
+            {html_cfg_dict}
+          </body>
+        </html>
+        """
+    return html_cfg
 
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
 # todo add feature: rounded lat long dummies (should improve ols)
@@ -428,7 +462,7 @@ train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_17_11:40:12/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_18_09:03:52/history.csv'
 
 # output file paths
 model_fit_log_dir = f'{run_dir}logs/'
@@ -460,15 +494,15 @@ cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding par
                   'batch_size_choices': [1000, 10000],
                   'loss_choices': ['mae', 'mse']
                   },
-       'layers': [['relu', 256],
-                  ['relu', 256],
-                  ['relu', 128],
-                  ['relu', 128],
-                  ['relu', 128],
+       'layers': [['relu', 32],
+                  ['relu', 32],
+                  # ['relu', 128],
+                  # ['relu', 128],
+                  # ['relu', 128],
                   ['linear', 1]],
        'epochs': 20,
        'batch_size': 1000,
-       'learning_rate': .01,
+       'learning_rate': .1,
        'loss': 'mae',
        'metrics': [root_mean_squared_logarithmic_error],
        }
@@ -544,6 +578,16 @@ if cfg['tuning']['tune?']:
                         validation_data=(validation_x, validation_y),
                         callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
                         )
+    model_cfg = model.get_config()
+    best_hps_dict = {'num_of_layers': best_hps['num_of_layers'],
+                    'learning_rate': best_hps['learning_rate'],
+                    'batch_size': best_hps['batch_size'],
+                    'loss_metric': best_hps['loss_choices']
+                    }
+    for param, val in best_hps.values.items():
+        if '#_nodes' in param:
+            best_hps_dict[param] = val
+
 # non-tuning run that takes params from cfg
 else:
     model = keras.Sequential()
@@ -564,7 +608,7 @@ else:
                         callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
                         )
 
-# # miscellaneous writes
+# miscellaneous writes
 write_histogram(train, train_histogram_path)
 # write_pickup_dropoff_scatterplot_map(train, train_map_path)
 write_correlation_matrix_heatmap(train, correlation_heatmap_path)
@@ -575,7 +619,9 @@ shared.write_model_graph(model, model_graph_path)
 html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
 html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
 html_loss = shared.build_training_plot_html(history, 'loss', ols_error)
-html_cfg = shared.convert_dict_to_html(cfg)
+html_cfg = build_cfg_html(cfg)
+html_best_hps = build_hyperparam_html(best_hps_dict)
+
 # todo only compare when it's the same loss function
 html_val_loss_improvement = \
     build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path)
@@ -588,6 +634,7 @@ with open(model_accuracy_report_path, 'a') as report:
     report.write(html_loss)
     report.write(html_accuracy)
     report.write(html_model_graph)
+    report.write(html_best_hps)
     report.write(html_cfg)
     report.close()
     print('done writing report')
