@@ -21,5 +21,6 @@ dependencies:
       - geopandas
       - statsmodels
       - seaborn
+      - keras-tuner
 prefix: ~/miniconda3/envs/ml
 

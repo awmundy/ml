@@ -1,4 +1,6 @@
 import os
+# turn off tensorflow info messages about e.g. cpu optimization features
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 from tensorflow.keras import layers
 from tensorflow import keras
 import tensorflow as tf
@@ -11,10 +13,12 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor as ge
 import geopandas as gpd
 from matplotlib.lines import Line2D
 import matplotlib
-matplotlib.use("Qt5Agg")
+# matplotlib.use("Qt5Agg") # backend that a dev requires for plot to work
 from sys import platform
 from datetime import datetime as dt
 import webbrowser
+import keras_tuner as kt
+from tensorboard import program
 
 pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 500)
@@ -27,8 +31,6 @@ else:
     import ml.shared as shared
     import ml.taxi.taxi_shared as taxi_shared
 
-# turn off tensorflow info messages about e.g. cpu optimization features
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 def write_histogram(df, output_path):
     ignore_cols = ['id']
@@ -102,7 +104,7 @@ def write_pickup_dropoff_scatterplot_map(train, train_map_path):
 
     # zoom in on the area these points are in
     minx = min(pickup_gdf['pickup_longitude'].min(), dropoff_gdf['dropoff_longitude'].min()) - .01
-    maxx = min(pickup_gdf['pickup_longitude'].max(), dropoff_gdf['dropoff_longitude'].max()) +.01
+    maxx = min(pickup_gdf['pickup_longitude'].max(), dropoff_gdf['dropoff_longitude'].max()) + .01
     miny = min(pickup_gdf['pickup_latitude'].min(), dropoff_gdf['dropoff_latitude'].min()) - .01
     maxy = min(pickup_gdf['pickup_latitude'].max(), dropoff_gdf['dropoff_latitude'].max()) + .01
     ax.set_xlim(minx, maxx)
@@ -127,7 +129,7 @@ def write_correlation_matrix_heatmap(train, out_path):
     hm.set_yticklabels(hm.get_ymajorticklabels(), fontsize=16, rotation=30)
     # make sure laels are on top and bottom
     plt.tick_params(axis='both', which='major',
-                    labelbottom = True, bottom=True, top = False, labeltop=True)
+                    labelbottom=True, bottom=True, top=False, labeltop=True)
     plt.savefig(out_path)
 
 def drop_id_column(df):
@@ -146,7 +148,7 @@ def get_ols_error(train_x, train_y, test_x, test_y):
 
     model = sm.OLS(train_y, train_x, missing='raise', hasconst=True)
     res = model.fit()
-    print(res.summary2())
+    # print(res.summary2())
     ols_pred = res.predict(test_x)
 
     # construct mean absolute error
@@ -316,16 +318,96 @@ def copy_lat_long(df):
     df.insert(0, 'pick_lat_raw', df['pickup_latitude'])
     return df
 
+class CustomHyperModel(kt.HyperModel):
+    '''
+    Class that is passed to the hyperparameter tuning function
+    '''
+    def __init__(self, layer_range, node_range, learning_rate_choices,
+                 batch_size_choices, loss_choices, metrics):
+        self.layer_range = layer_range
+        self.node_range = node_range
+        self.learning_rate_choices = learning_rate_choices
+        self.batch_size_choices = batch_size_choices
+        self.loss_choices = loss_choices
+        self.metrics = metrics
+
+    # this must be called build or keras won't recognize it
+    def build(self, hp):
+        '''
+        hp: kt.engine.hyperparameters.HyperParameters object
+        '''
+        model = keras.Sequential()
+
+        # tune number of layers
+        for i in range(hp.Int('num_of_layers', self.layer_range[0], self.layer_range[1])):
+            # tune layer size
+            model.add(keras.layers.Dense(units=hp.Int('#_nodes_l' + str(i),
+                                                      min_value=self.node_range[0],
+                                                      max_value=self.node_range[1],
+                                                      step=32),
+                                         activation='relu'))
+
+        model.add(keras.layers.Dense(1, activation='linear'))
+
+
+        hp_learning_rate = hp.Choice('learning_rate', values=[self.learning_rate_choices[0],
+                                                              self.learning_rate_choices[1]])
+        hp_loss = hp.Choice('loss_choices', values=[self.loss_choices[0],
+                                                    self.loss_choices[1]])
+        model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
+                      loss=hp_loss,
+                      metrics=self.metrics)
+        return model
+
+    # must be called fit for keras to recognize it, *args/**kwargs are
+    # passed in from tuner.search()
+    def fit(self, hp, model, *args, **kwargs):
+        return model.fit(
+                *args,
+                batch_size=hp.Choice("batch_size", [self.batch_size_choices[0],
+                                                    self.batch_size_choices[1]]),
+                **kwargs)
+
+def launch_tensorboards(model_fit_log_dir, tuning_log_dir):
+    '''
+    Launches a tensorboard dashboard for the model fit.
+    Also launches a dashboard for hyperparameter tuning if that was done.
+    Tensorboard can be launched from the command line directly with:
+        tensorboard --logdir='path_to_logs' --port=inert_port_num_here
+        (port optional but default port may be already used)
+    '''
+
+    tb_model = program.TensorBoard()
+    tb_model.configure(argv=[None, '--logdir', model_fit_log_dir])
+    url_model = tb_model.launch()
+    print(f"Model fit dashboard available on {url_model}")
+    if os.path.exists(tuning_log_dir):
+        tb_tune = program.TensorBoard()
+        tb_tune.configure(argv=[None, '--logdir', tuning_log_dir])
+        url_tune = tb_tune.launch()
+        print(f"Hyperparameter tuning dashboard available on {url_tune}")
+
+def root_mean_squared_logarithmic_error(y_true, y_pred):
+    '''
+    Uses tensorflow math functions to return the root mean squared log error as a tensor
+    '''
+    # used to avoid log(0) issues
+    epsilon = tf.constant(0.00001)
+
+    log_error = tf.math.log(y_true + epsilon) - tf.math.log(y_pred + epsilon)
+    sq_log_error = tf.pow(log_error, 2)
+    mean_sq_log_error = tf.reduce_mean(sq_log_error)
+    root_mean_sq_log_error = tf.math.sqrt(mean_sq_log_error)
+
+    return root_mean_sq_log_error
 
 
 # todo make vif calc more performant and/or hardcode in a minimal set of x vars for ols purposes
-# todo implement root mean squared logarithmic error as the error metric (for ols as well?)
 # todo add feature: rounded lat long dummies (should improve ols)
 # todo add feature: interactions (e.g. borough-time of day)
 # todo add feature: airport dummies
 # todo query google api to get distance between ~few hundred rounded lat long points,
 #  built dataset of road distances between these points
-# todo try automated hyperparameter tuning with keras tuner
 
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
@@ -334,20 +416,24 @@ turn_off_scientific_notation()
 if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
     os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
 
+# construct run_dir
 usr_dir = os.path.expanduser('~')
 run_time = dt.now().strftime('%Y_%m_%d_%H:%M:%S')
 run_dir = f'{usr_dir}/Documents/ml_taxi/runs/{run_time}/'
-inputs_dir = f'{usr_dir}/Documents/ml_taxi/'
 os.makedirs(run_dir, exist_ok=True)
 
 # input file paths
+inputs_dir = f'{usr_dir}/Documents/ml_taxi/'
 train_path = f'{inputs_dir}train_w_boro.csv'
 kaggle_test_path = f'{inputs_dir}test.csv'
 # https://data.cityofnewyork.us/api/geospatial/tqmj-j8zm?method=export&format=Shapefile
 nyc_boundary_path = f'{inputs_dir}nyc_borough_geo_files/geo_export_d66f2294-5e4d-4fd3-92f2-cdb0a859ef48.shp'
-run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_08_21:24:46/history.csv'
+run_to_compare_against_history_path = f'{inputs_dir}runs/2022_11_17_11:40:12/history.csv'
 
 # output file paths
+model_fit_log_dir = f'{run_dir}logs/'
+tuning_dir = f'{run_dir}/hyperparam_tuning/'
+tuning_log_dir = f'{tuning_dir}logs/'
 train_histogram_path = f'{run_dir}histogram_train.png'
 test_histogram_path = f'{run_dir}histogram_test.png'
 train_map_path = f'{run_dir}map_train.png'
@@ -355,6 +441,7 @@ correlation_heatmap_path = f'{run_dir}correlation_heatmap_train.png'
 model_graph_path = f'{run_dir}model_graph.png'
 model_accuracy_report_path = f'{run_dir}model_accuracy_report.html'
 history_path = f'{run_dir}history.csv'
+tuning_dir = f'{run_dir}/hyperparam_tuning/'
 
 # variables
 y_var = 'trip_duration'
@@ -365,78 +452,122 @@ x_vars = [
     'const', 'passenger_count', 'store_and_fwd_flag', 'vendor_id',
     'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
     ]
-#x_vars = ['const']
 
+cfg = {'tuning': {'tune?': True, # if true, vals below replace corresponding parts of cfg
+                  'layer_range': [1, 2],
+                  'node_range': [32, 64], # must be multiples of 32
+                  'learning_rate_choices': [.01, .1],
+                  'batch_size_choices': [1000, 10000],
+                  'loss_choices': ['mae', 'mse']
+                  },
+       'layers': [['relu', 256],
+                  ['relu', 256],
+                  ['relu', 128],
+                  ['relu', 128],
+                  ['relu', 128],
+                  ['linear', 1]],
+       'epochs': 20,
+       'batch_size': 1000,
+       'learning_rate': .01,
+       'loss': 'mae',
+       'metrics': [root_mean_squared_logarithmic_error],
+       }
 
 dtypes, dt_cols = taxi_shared.get_dtypes('train')
-train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols)
-#train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols, nrows=100000)
-print(len(train))
-
-
+train = pd.read_csv(train_path, dtype=dtypes, parse_dates=dt_cols,
+                    nrows=10000  # todo remove when done testing
+                    )
 train = add_const(train)
 train = remove_0_passenger_count_trips(train)
 train = remove_outlier_long_duration_trips(train)
 train = drop_id_column(train)
 train = convert_categoricals_to_float(train)
 
-train, x_vars = assign_distance(train, x_vars)
+# train, x_vars = assign_distance(train, x_vars)
 # train = remove_outlier_long_distance_trips(train)
 train, x_vars = add_time_frequencies(train, x_vars, '1H')
 train, x_vars = add_weekends(train, x_vars)
-
-
 train = normalize(train)
 
 train = train[x_vars + [y_var]].copy()
 assert train.notnull().all().all()
 
-# write out some eda plots
-# write_histogram(train, train_histogram_path)
-# write_pickup_dropoff_scatterplot_map(train, train_map_path)
-# write_correlation_matrix_heatmap(train, correlation_heatmap_path)
-
 train_x, train_y, validation_x, validation_y, test_x, test_y = \
     get_train_test_val_split(train, .1, .1, y_var)
 ols_error, ols_rmsle = get_ols_error(train_x, train_y, test_x, test_y)
-print(ols_error, ols_rmsle)
+# print(ols_error, ols_rmsle)
 
-
-cfg = {'layers': [['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['relu', 64],
-                  ['linear', 1]],
-       'epochs': 150,
-       'batch_size': 10000,
-       'learning_rate': .01,
-       'loss': 'mae',
-       'metrics': ['mean_squared_logarithmic_error'],
-       }
 cfg['x_vars'] = x_vars
 
+# hyperparam tuning run that discovers best hyperparameters
+if cfg['tuning']['tune?']:
+    cfg_t = cfg['tuning']
 
-model = keras.Sequential()
-for activation, size in cfg['layers']:
-    model.add(layers.Dense(size, activation=activation))
+    # build the hypermodel with hyperparam specified in the config
+    tuning_model_builder = \
+        CustomHyperModel(layer_range=cfg_t['layer_range'],
+                         node_range=cfg_t['node_range'],
+                         learning_rate_choices=cfg_t['learning_rate_choices'],
+                         batch_size_choices=cfg_t['batch_size_choices'],
+                         loss_choices=cfg_t['loss_choices'],
+                         metrics=cfg['metrics'])
 
-model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
-              loss=cfg['loss'],
-              metrics=cfg['metrics'])
+    # build a tuner object that will be used to search the hyperparameter space
+    tuner = kt.Hyperband(tuning_model_builder,
+                         # requires the string name of the function
+                         objective=kt.Objective('root_mean_squared_logarithmic_error', 'min'),
+                         max_epochs=10,
+                         directory=tuning_dir,
+                         project_name='checkpoints_and_results')
 
-history = model.fit(train_x,
-                    train_y,
-                    shuffle=False,
-                    epochs=cfg['epochs'],
-                    batch_size=cfg['batch_size'],
-                    validation_data=(validation_x, validation_y)
-                    # callbacks=keras.callbacks.CSVLogger('path_to_log_file.txt',
-                    # verbose=0
-                    )
+    # iterate through the hyperparam options, discovering the best ones
+    tuner.search(train_x, train_y, epochs=10, shuffle=False,
+                 validation_data=(validation_x, validation_y),
+                 callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=5),
+                            keras.callbacks.TensorBoard(tuning_log_dir)])
 
-# miscellaneous writes
+    # extract best hyperparams from the search (num trials is how many
+    # of the best hyperparam sets to return)
+    best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
+    print(f'Building model with the following tuned values:')
+    for k, v in best_hps.values.items():
+        print(f'{k}: {v}')
+    model = tuner.hypermodel.build(best_hps)
+    best_batch_size = best_hps.values['batch_size']
+
+    # train model
+    history = model.fit(train_x,
+                        train_y,
+                        shuffle=False,
+                        epochs=cfg['epochs'],
+                        batch_size=best_batch_size,
+                        validation_data=(validation_x, validation_y),
+                        callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
+                        )
+# non-tuning run that takes params from cfg
+else:
+    model = keras.Sequential()
+    for activation, size in cfg['layers']:
+        model.add(layers.Dense(size, activation=activation))
+
+    model.compile(optimizer=keras.optimizers.RMSprop(cfg['learning_rate']),
+                  loss=cfg['loss'],
+                  metrics=cfg['metrics'])
+
+    # train model
+    history = model.fit(train_x,
+                        train_y,
+                        shuffle=False,
+                        epochs=cfg['epochs'],
+                        batch_size=cfg['batch_size'],
+                        validation_data=(validation_x, validation_y),
+                        callbacks=[keras.callbacks.TensorBoard(model_fit_log_dir)],
+                        )
+
+# # miscellaneous writes
+write_histogram(train, train_histogram_path)
+# write_pickup_dropoff_scatterplot_map(train, train_map_path)
+write_correlation_matrix_heatmap(train, correlation_heatmap_path)
 write_history_df(history, history_path)
 shared.write_model_graph(model, model_graph_path)
 
@@ -445,6 +576,7 @@ html_model_graph = shared.read_image_as_html(model_graph_path, 'Model Graph')
 html_accuracy = shared.build_training_plot_html(history, cfg['metrics'][0])
 html_loss = shared.build_training_plot_html(history, 'loss', ols_error)
 html_cfg = shared.convert_dict_to_html(cfg)
+# todo only compare when it's the same loss function
 html_val_loss_improvement = \
     build_val_loss_improvement_compared_to_previous_run_html(history, run_to_compare_against_history_path)
 
@@ -460,3 +592,4 @@ with open(model_accuracy_report_path, 'a') as report:
     report.close()
     print('done writing report')
 webbrowser.open(model_accuracy_report_path)
+launch_tensorboards(model_fit_log_dir, tuning_log_dir)
