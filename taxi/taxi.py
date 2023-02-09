@@ -31,6 +31,10 @@ else:
     import ml.shared as shared
     import ml.taxi.taxi_shared as taxi_shared
 
+# add graphviz to path for those who are blocked from updating it more directly
+if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
+    os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
+
 
 def write_histogram(df, output_path):
     ignore_cols = ['id']
@@ -446,9 +450,7 @@ def build_cfg_html(cfg):
 shared.use_cpu_and_make_results_reproducible()
 turn_off_scientific_notation()
 
-# add graphviz to path for those who are blocked from updating it more directly
-if "GRAPHVIZ_PATH_EXT" in os.environ.keys():
-    os.environ["PATH"] += os.pathsep + os.environ["GRAPHVIZ_PATH_EXT"]
+
 
 # construct run_dir
 usr_dir = os.path.expanduser('~')
